@@ -256,34 +256,28 @@ class App(tk.Tk):
         frame.tkraise()
         
     def startScan(self):
-        Altitud = 6
-        Asimuth = 6
-        Roll = 3
-        radioEsfera=299
-
-        GAltitude, GAsimut, GRoll = prueba_1.calcular_grados(Altitud, Asimuth, Roll)
-        # Impresión de los resultados
-        print("Grados de Altitud:", GAltitude)
-        print("Grados de Asimuth:", GAsimut)
-        print("Grados de Roll:", GRoll)
-
-        resultado1 = prueba_1.CalcularArreglo1(GAsimut)
-        print("Resultado de calcular_arreglo1:",resultado1)
-
-        resultado2 = prueba_1.CalcularArreglo2(GAltitude)
-        print("Resultado de calcular_arreglo2:",resultado2)
-
-        resultado3 = prueba_1.CalcularArreglo3(GRoll)
-        print("Resultado de calcular_arreglo3:",resultado3)
-
-        result = prueba_1.CalcularPuntosMovimiento(resultado1, resultado2,radioEsfera)
-        print("Resultado de calcular_puntos_movimiento:", result)
-
-        si = (len(resultado1) - 1) * (len(resultado2) - 1)
-        print("El volor de interacion:", si)
+        Asimuth, Altitud, Roll, sphere_radius, selected_option, radio_var = self.frames["StartPage"].getSliderData()
+        if Asimuth == 0 or  Altitud == 0 or Roll == 0 or sphere_radius == 0:
+            raise ValueError("Alguno de los valores es igual a cero")
+        else:
+            print(radio_var)
+            if (radio_var=="Option 1"):  # Replace 'condition' with your actual condition
+                print("Hola mundo")
+                prueba_1.procesarDatos(Asimuth,Altitud,Roll)
+            else:
+                if (selected_option=="Option 36"):
+                    resultado = prueba_1.Select_Imagenes_modo_2(36)
+                    prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
+                if (selected_option=="Option 64"):
+                    resultado = prueba_1.Select_Imagenes_modo_2(64)
+                    prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
 
 
-        resultado = prueba_1.CalcularPuntosCinematicaInversa(result,si)
+                
+                
+            
+
+
         
 
         self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
@@ -364,60 +358,59 @@ class StartPage(tk.Frame):
             
         self.buttonFrame = tk.Frame(self) #,highlightbackground="black",highlightthickness=1
         self.buttonStart = tk.Button(self.buttonFrame, text = 'Iniciar Captura', width = 25, command = self.controller.startScan)
-        self.buttonStart.grid(sticky="W",row = 0, column = 3, pady = 5, padx = 10)
+        self.buttonStart.grid(sticky="W",row = 0, column = 5, pady = 5, padx = 10)
         
         self.buttonSettings = tk.Button(self.buttonFrame, text = 'Configuracion', width = 25, command=lambda: controller.show_frame("SettingsPage"))
-        self.buttonSettings.grid(sticky="W",row = 1, column = 3, pady = 5, padx = 10)
+        self.buttonSettings.grid(sticky="W",row = 1, column = 5, pady = 5, padx = 10)
         
         self.buttonShowPC = tk.Button(self.buttonFrame, text = 'Mostrar modelo', width = 25, command = self.controller.showPC)
-        self.buttonShowPC.grid(sticky="W",row = 2, column = 3, pady = 5, padx = 10)
+        self.buttonShowPC.grid(sticky="W",row = 2, column = 5, pady = 5, padx = 10)
              
         self.stlButton = tk.Button(self.buttonFrame, text = 'Convertir a STL', width = 25, command = self.controller.makeSTL)
-        self.stlButton.grid(sticky="W",row = 3, column = 3, pady = 5, padx = 10)
+        self.stlButton.grid(sticky="W",row = 3, column =5, pady = 5, padx = 10)
         
         self.saveButton = tk.Button(self.buttonFrame, text = 'Guardar STL', width = 25, command = self.controller.saveSTL)
-        self.saveButton.grid(sticky="W",row = 4, column = 3, pady = 5, padx = 10)
+        self.saveButton.grid(sticky="W",row = 4, column = 5, pady = 5, padx = 10)
         
         self.quitButton = tk.Button(self.buttonFrame, text = 'Salir', width = 25, command = self.controller.close_windows)
-        self.quitButton.grid(sticky="W",row = 5, column = 3, pady = 5, padx = 10)
+        self.quitButton.grid(sticky="W",row = 5, column = 5, pady = 5, padx = 10)
 
 
         #Sliders
+        
         label1 = tk.Label(self.buttonFrame, text="Posicion azimut")
         label1.grid(sticky="W", row=0, column=0, pady=5, padx=10)
+        self.sliderAzimuth = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderAzimuth.grid(sticky="W", row=0, column=1, pady=5, padx=10)
 
-        self.slider = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
-        self.slider.grid(sticky="W", row=0, column=1, pady=5, padx=10)
 
         label2 = tk.Label(self.buttonFrame, text="Posicion Altitud")
         label2.grid(sticky="W", row=1, column=0, pady=5, padx=10)
-        
-        self.slider = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
-        self.slider.grid(sticky="W", row=1, column=1, pady=5, padx=10)
+        self.sliderAltitude = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderAltitude.grid(sticky="W", row=1, column=1, pady=5, padx=10)
 
         label3 = tk.Label(self.buttonFrame, text="Posicion Roll")
         label3.grid(sticky="W", row=2, column=0, pady=5, padx=10)
+        self.sliderRoll = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderRoll.grid(sticky="W", row=2, column=1, pady=5, padx=10)
 
-        self.slider = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
-        self.slider.grid(sticky="W", row=2, column=1, pady=5, padx=10)
-
-        label2 = tk.Label(self.buttonFrame, text="Radio de la esfera")
-        label2.grid(sticky="W", row=3, column=0, pady=5, padx=10)
-
-        self.slider = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
-        self.slider.grid(sticky="W", row=3, column=1, pady=5, padx=10)
-
+        
+        label4 = tk.Label(self.buttonFrame, text="Radio de la esfera")
+        label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
+        self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
 
        
 
 
-        self.selectLabel = tk.Label(self.buttonFrame, text="Select an option:")
-        self.selectLabel.grid(sticky="W", row=5, column=0, pady=5, padx=10)
+    
+        self.selectLabel = tk.Label(self.buttonFrame, text="Seleccionar una opcion:")
+        self.selectLabel.grid(sticky="W", row=0, column=4, pady=5, padx=10)
 
-        self.options = ["Option 1", "Option 2", "Option 3"]
+        self.options = ["Option 36","Option 64"]
         self.selectedOption = tk.StringVar()
         self.selectMenu = tk.OptionMenu(self.buttonFrame, self.selectedOption, *self.options)
-        self.selectMenu.grid(sticky="W", row=5, column=1, pady=5, padx=10)
+        self.selectMenu.grid(sticky="W", row=1, column=4, pady=5, padx=10)
 
 
         self.radioLabel = tk.Label(self.buttonFrame, text="Selecciona modo de captura:")
@@ -446,6 +439,19 @@ class StartPage(tk.Frame):
         self.canvas.grid(sticky="s",row = 0, column = 2)
         self.canvas.create_image(0,0, anchor='nw', image=self.render)    
         self.canvas.image = self.render  
+
+
+
+    def getSliderData(self):
+            azimuth = self.sliderAzimuth.get()
+            altitude = self.sliderAltitude.get()
+            roll = self.sliderRoll.get()
+            sphere_radius = self.sliderSphereRadius.get()
+            selected_option = self.selectedOption.get()
+            radio_var = self.radioVar.get()
+            
+            return azimuth, altitude, roll, sphere_radius, selected_option, radio_var
+
 
     def showImage(self,iArray):
         self.load = Image.fromarray(iArray, 'RGB')

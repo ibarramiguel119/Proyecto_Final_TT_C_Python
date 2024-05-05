@@ -198,6 +198,90 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
 }
 
 
+void procesarDatos(int slider1Value, int slider0Value, int slider2Value) {
+    int GAltitude, GAsimut, GRoll;
+    int radioEsfera = 299;
+
+    CalcularGrados(slider1Value, slider0Value, slider2Value, GAltitude, GAsimut, GRoll);
+    std::cout << "Grados en Altitude: " << GAltitude << std::endl;
+    std::cout << "Grados en Asimuth: " << GAsimut << std::endl;
+    std::cout << "Grados en Roll:" << GRoll << std::endl;
+
+    //Muestra el arreglo de distribuccion de angulos de Azimuth
+    std::vector<int> resultado1 = CalcularArreglo1(GAsimut);
+    // Imprimir el contenido del vector devuelto
+    std::cout << "Los datos del arreglo 1:" << std::endl;
+    for (int value1 : resultado1) {
+        std::cout << value1 << " ";
+    }
+    std::cout << std::endl;
+
+    //Muestra el arreglo de distribuccion de angulos de Altitude
+    std::vector<int> resultado2 = CalcularArreglo2(GAltitude);
+    // Imprimir el contenido del vector devuelto
+    std::cout << "Los datos del arreglo 2:" << std::endl;
+    for (int value2 : resultado2) {
+        std::cout << value2 << " ";
+    }
+    std::cout << std::endl;
+
+    //Muestra el arreglo de distribuccion de grados de Roll
+    std::vector<int> resultado3 = CalcularArreglo3(GRoll);
+    // Imprimir el contenido del vector devuelto
+    std::cout << "Los datos del arreglo 3:" << std::endl;
+    for (int value3 : resultado3) {
+        std::cout << value3 << " ";
+    }
+    std::cout << std::endl;
+
+    // Esta funcion calcula los puntos de posicionamiento de la circunferencia
+    std::vector<std::vector<int>> result = CalcularPuntosMovimiento(resultado1, resultado2, slider2Value);
+
+    // Imprimir el resultado
+    // Calculo del tamaño del tamaño de la forma en se movera el robot 
+    int si = (resultado1.size() - 1) * (resultado2.size() - 1);
+    std::cout << si << std::endl;
+
+    ///Imprimir los datos de vector D por separado
+    CalcularPuntosCinematicaInversa(result, si);
+}
+
+void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, int& NRoll){
+    switch (Numero_imagenes)
+    {
+    case 36: 
+        NAltitude=6;
+        NAsimut=6;
+        NRoll=3;
+        break;
+    case 64:
+        NAltitude=8;
+        NAsimut=8;
+        NRoll=3;
+        break;    
+    case 72:
+    std::cout << "Se ha inicializado el el modo de selecion automatico 72" << std::endl;
+        break;
+    case 128:
+        std::cout << "Se ha inicializado el el modo de selecion automatico 128" << std::endl;
+        break;
+    case 256:
+        std::cout << "Se ha inicializado el el modo de selecion automatico 256" << std::endl;
+        break;
+    case 512:
+        std::cout << "Se ha inicializado el el modo de selecion automatico 512" << std::endl;
+        break;
+    default:
+        std::cout << "Error verificar el problema con el dato de entrada" << std::endl;
+        break;
+    }
+}
+
+
+
+
+
+
 PYBIND11_MODULE(prueba_1, m) {
     m.doc() = "sistema de cordenadas para el robot3DSystem"; // optional module docstring
 
@@ -215,7 +299,18 @@ PYBIND11_MODULE(prueba_1, m) {
     m.def("CalcularPuntosMovimiento", &CalcularPuntosMovimiento, "Función para calcular puntos de movimiento");
     m.def("grados_a_radianes", &grados_a_radianes, "Funcion de que convierte grados a radianes");
     m.def("sph2cart", &sph2cart, "Funcion que convierte cordendas esfericas a cartesianas");
+    
+    m.def("procesarDatos", &procesarDatos,"Esta funcion simplifica la llamadas en el programa principal");
+
     m.def("CalcularPuntosCinematicaInversa", &CalcularPuntosCinematicaInversa, "Funcion que calcula la cinematica inversa del robot3DSystem");
+
+
+    m.def("Select_Imagenes_modo_2", [](int Numero_imagenes) {
+        int NAltitude, NAsimut, NRoll;
+        Select_Imagenes_modo_2(Numero_imagenes, NAltitude, NAsimut, NRoll);
+        // Retorna los resultados como una tupla de Python
+        return py::make_tuple(NAltitude, NAsimut, NRoll);
+    }, "Calculates el numero de imagenes a regresar");
 }
 
 
