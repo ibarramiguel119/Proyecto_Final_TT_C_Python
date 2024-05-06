@@ -8,6 +8,19 @@
 #include <vector>
 #include <cmath>
 #include <tuple>
+#include <windows.h>
+#include <string>
+#include <cstring>
+#include <sstream>
+#include <iomanip>
+#include <fcntl.h>
+
+
+
+
+
+
+
 
 
 namespace py = pybind11;
@@ -16,6 +29,12 @@ namespace py = pybind11;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+
+std::string floatToString(float value, int precision);
+bool enviarDatosPorPuertoSerie(const std::string& datos);
+
+
 
 int addNumbers(int a, int b) {
     auto sum= a + b;
@@ -157,6 +176,16 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             auto q4=atan(-q2/q3);
             std::cout << "Coordenadas cartesianas (q1,q2,q3,q4): ";
             std::cout << q1 << ", " << q2 << ", " << q3 <<","<<q4<< std::endl;
+
+            //Convercion a string
+            std::string q1_str = floatToString(q1, 4);
+            std::string q2_str = floatToString(q2, 4);
+            std::string q3_str = floatToString(q3, 4);
+            std::string q4_str = floatToString(q4, 4);
+            std::string data = q1_str + "," + q2_str + "," + q3_str + "," + q4_str;
+            enviarDatosPorPuertoSerie(data);
+            std::cout << "Datos enviados: " << data << std::endl;
+            std::cout << "Datos enviados correctamente." << std::endl;
         }
         
         if (cont > 4 && cont <= 8)
@@ -169,6 +198,17 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             auto q4=atan(-q2/q3);
             std::cout << "Coordenadas cartesianas (q1,q2,q3,q4): ";
             std::cout << q1 << ", " << q2 << ", " << q3 <<","<<q4<< std::endl;
+            //Convercion a string
+            
+            std::string q1_str = floatToString(q1, 4);
+            std::string q2_str = floatToString(q2, 4);
+            std::string q3_str = floatToString(q3, 4);
+            std::string q4_str = floatToString(q4, 4);
+            std::string data = q1_str + "," + q2_str + "," + q3_str + "," + q4_str;
+            enviarDatosPorPuertoSerie(data);
+            std::cout << "Datos enviados: " << data << std::endl;
+            std::cout << "Datos enviados correctamente." << std::endl;
+           
         }
         
         //Para q2 se tiene que:
@@ -278,6 +318,85 @@ void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, in
 }
 
 
+std::string findSerialPort(const std::string& Port) {
+    std::string portName = "";
+
+    HANDLE hSerial = CreateFile(Port.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    
+    if (hSerial != INVALID_HANDLE_VALUE) {
+        // El puerto existe
+        portName = Port;
+        CloseHandle(hSerial);
+    } else {
+        portName = ""; 
+    }
+
+    return portName;
+}
+
+bool enviarDatosPorPuertoSerie(const std::string& datos) {
+
+    auto Ports="\\\\.\\COM14";
+    std::string puertoEspecifico = Ports; 
+    std::string puerto = findSerialPort(puertoEspecifico);
+    if (!puerto.empty()) {
+        printf("Puerto serie encontrado: %s\n", puerto.c_str());
+    } else {
+        printf("No se encontró ningún puerto serie válido.\n");
+    }
+
+
+    // Abrir el puerto serie
+    HANDLE serial_fd = CreateFile(puerto.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (serial_fd == INVALID_HANDLE_VALUE) {
+        std::cerr << "Error al abrir el puerto serie " << puerto << std::endl;
+        return false;
+    }
+
+    // Configurar la comunicación serie
+    DCB serial_options = { 0 };
+    serial_options.DCBlength = sizeof(serial_options);
+    if (!GetCommState(serial_fd, &serial_options)) {
+        std::cerr << "Error al obtener la configuración del puerto serie." << std::endl;
+        CloseHandle(serial_fd);
+        return false;
+    }
+    serial_options.BaudRate = CBR_115200;
+    serial_options.ByteSize = 8;
+    serial_options.StopBits = ONESTOPBIT;
+    serial_options.Parity = NOPARITY;
+    if (!SetCommState(serial_fd, &serial_options)) {
+        std::cerr << "Error al configurar el puerto serie." << std::endl;
+        CloseHandle(serial_fd);
+        return false;
+    }
+
+    // Datos a enviar
+    DWORD bytes_written;
+    if (!WriteFile(serial_fd, datos.c_str(), datos.length(), &bytes_written, NULL)) {
+        std::cerr << "Error al enviar datos por el puerto serie." << std::endl;
+        CloseHandle(serial_fd);
+        return false;
+    }
+  
+
+    // Cerrar el puerto serie
+    CloseHandle(serial_fd);
+
+    return true;
+} 
+
+std::string floatToString(float value, int precision) {
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(precision) << value;
+    return ss.str();
+}
+
+
+
+
+
+
 
 
 
@@ -311,6 +430,9 @@ PYBIND11_MODULE(prueba_1, m) {
         // Retorna los resultados como una tupla de Python
         return py::make_tuple(NAltitude, NAsimut, NRoll);
     }, "Calculates el numero de imagenes a regresar");
+
+    m.def("enviarDatosPorPuertoSerie", &enviarDatosPorPuertoSerie, "Función para enviar datos por un puerto serie.");
+    
 }
 
 
