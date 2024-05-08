@@ -244,8 +244,8 @@ class App(tk.Tk):
 
         self.show_frame("StartPage")
         
-        self.frames["StartPage"].stlButton.configure(bg = "#cccccc")
-        self.frames["StartPage"].saveButton.configure(bg = "#cccccc")
+        #self.frames["StartPage"].stlButton.configure(bg = "#cccccc")
+        #self.frames["StartPage"].saveButton.configure(bg = "#cccccc")
         self.frames["StartPage"].buttonShowPC.configure(bg = "#cccccc")
         self.enablePC = False
         self.enableSaveSTL = False
@@ -262,28 +262,65 @@ class App(tk.Tk):
         else:
             print(radio_var)
             if (radio_var=="Option 1"):  # Replace 'condition' with your actual condition
-                print("Hola mundo")
-                prueba_1.procesarDatos(Asimuth,Altitud,Roll)
+                #prueba_1.procesarDatos(Asimuth,Altitud,Roll)
+                #datos_recibidos = prueba_1.recibirDatosPorPuertoSerie()
+                #print("Datos recibidos en python:", datos_recibidos)  
+               
+                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+                self.scan.startPipeline()
+                self.frames["StartPage"].startProgress()
+                try:
+                    while True:
+                        datos_recibidos = prueba_1.recibirDatosPorPuertoSerie()
+                        print(repr(datos_recibidos))
+                        datos_recibidos = datos_recibidos.rstrip('\x00')  # Elimina caracteres nulos del final de la cadena
+                        if datos_recibidos == "Foto":
+                            print("Los datos recibidos son exactamente 'Foto tomar foto'.")
+                            self.scan.takeFoto()
+                            self.frames["StartPage"].showImage(self.scan.giveImageArray())   
+                            print("Se capturo foto")  
+                            self.update()         
+                        #angle = float(self.ard.giveAngle())
+                        #self.frames["StartPage"].Progress(angle)               
+                        #self.ard.rotate(int(self.dictionary["stepSize"]))
+                        #self.scan.processFoto(angle)
+                        #self.ard.waitForRotation()    
+                        #self.update()
+                        #if angle >= 360:
+                            #print("de cirkel is rond!")
+                            #self.frames["StartPage"].endProgress()
+                            #break
+                        
+                        #if keyboard.is_pressed('q'):
+                            #print("hij stopt")
+                            #break
+                except:
+                    print("loop is kapot") 
+                    pass
+                finally:      
+                    self.scan.stopPipeline()
+                    #self.ard.close()
+                    self.enablePC = True
+                    #self.frames["StartPage"].stlButton.configure(bg = "#f2f2f2")      
+                    self.frames["StartPage"].buttonShowPC.configure(bg = "#f2f2f2")
+
             else:
                 if (selected_option=="Option 36"):
                     resultado = prueba_1.Select_Imagenes_modo_2(36)
                     prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
+                    ##datos_recibidos = prueba_1.recibir_datos_por_puerto_serie()
                 if (selected_option=="Option 64"):
                     resultado = prueba_1.Select_Imagenes_modo_2(64)
                     prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
+                    #datos_recibidos = prueba_1.recibir_datos_por_puerto_serie()
 
 
-                
-                
-            
-
-
-        
 
         self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
         self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
         self.scan.startPipeline()
         self.frames["StartPage"].startProgress()
+        
         try:
             while True:
                 
@@ -366,11 +403,11 @@ class StartPage(tk.Frame):
         self.buttonShowPC = tk.Button(self.buttonFrame, text = 'Mostrar modelo', width = 25, command = self.controller.showPC)
         self.buttonShowPC.grid(sticky="W",row = 2, column = 5, pady = 5, padx = 10)
              
-        self.stlButton = tk.Button(self.buttonFrame, text = 'Convertir a STL', width = 25, command = self.controller.makeSTL)
-        self.stlButton.grid(sticky="W",row = 3, column =5, pady = 5, padx = 10)
+        #self.stlButton = tk.Button(self.buttonFrame, text = 'Convertir a STL', width = 25, command = self.controller.makeSTL)
+        #self.stlButton.grid(sticky="W",row = 3, column =5, pady = 5, padx = 10)
         
-        self.saveButton = tk.Button(self.buttonFrame, text = 'Guardar STL', width = 25, command = self.controller.saveSTL)
-        self.saveButton.grid(sticky="W",row = 4, column = 5, pady = 5, padx = 10)
+        #self.saveButton = tk.Button(self.buttonFrame, text = 'Guardar STL', width = 25, command = self.controller.saveSTL)
+        #self.saveButton.grid(sticky="W",row = 4, column = 5, pady = 5, padx = 10)
         
         self.quitButton = tk.Button(self.buttonFrame, text = 'Salir', width = 25, command = self.controller.close_windows)
         self.quitButton.grid(sticky="W",row = 5, column = 5, pady = 5, padx = 10)

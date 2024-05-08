@@ -33,6 +33,7 @@ namespace py = pybind11;
 
 std::string floatToString(float value, int precision);
 bool enviarDatosPorPuertoSerie(const std::string& datos);
+std::string recibirDatosPorPuertoSerie();
 
 
 
@@ -183,9 +184,16 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             std::string q3_str = floatToString(q3, 4);
             std::string q4_str = floatToString(q4, 4);
             std::string data = q1_str + "," + q2_str + "," + q3_str + "," + q4_str;
-            enviarDatosPorPuertoSerie(data);
+            enviarDatosPorPuertoSerie(data); 
+            //recibirDatosPorPuertoSerie();
             std::cout << "Datos enviados: " << data << std::endl;
             std::cout << "Datos enviados correctamente." << std::endl;
+            std::string datosRecibidos = recibirDatosPorPuertoSerie();
+            if (!datosRecibidos.empty()) {
+                std::cout << "Datos recibidos:" << datosRecibidos << std::endl;
+            } else {
+                std::cerr << "No se recibieron datos válidos por el puerto serie." << std::endl;
+            }
         }
         
         if (cont > 4 && cont <= 8)
@@ -208,7 +216,13 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             enviarDatosPorPuertoSerie(data);
             std::cout << "Datos enviados: " << data << std::endl;
             std::cout << "Datos enviados correctamente." << std::endl;
-           
+
+            std::string datosRecibidos = recibirDatosPorPuertoSerie();
+            if (!datosRecibidos.empty()) {
+                std::cout << "Datos recibidos:" << datosRecibidos << std::endl;
+            } else {
+                std::cerr << "No se recibieron datos válidos por el puerto serie." << std::endl;
+            }
         }
         
         //Para q2 se tiene que:
@@ -283,7 +297,7 @@ void procesarDatos(int slider1Value, int slider0Value, int slider2Value) {
     std::cout << si << std::endl;
 
     ///Imprimir los datos de vector D por separado
-    CalcularPuntosCinematicaInversa(result, si);
+    CalcularPuntosCinematicaInversa(result, si); 
 }
 
 void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, int& NRoll){
@@ -336,7 +350,7 @@ std::string findSerialPort(const std::string& Port) {
 
 bool enviarDatosPorPuertoSerie(const std::string& datos) {
 
-    auto Ports="\\\\.\\COM14";
+    auto Ports="\\\\.\\COM16";
     std::string puertoEspecifico = Ports; 
     std::string puerto = findSerialPort(puertoEspecifico);
     if (!puerto.empty()) {
@@ -386,6 +400,61 @@ bool enviarDatosPorPuertoSerie(const std::string& datos) {
     return true;
 } 
 
+
+
+
+std::string recibirDatosPorPuertoSerie() {
+    std::string datosRecibidos;
+
+    const char* puertoEspecifico = "\\\\.\\COM14"; // Cambiar a tu puerto serie específico
+    std::string puerto = puertoEspecifico;
+    
+    HANDLE serial_fd = CreateFile(puerto.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (serial_fd == INVALID_HANDLE_VALUE) {
+        std::cerr << "Error al abrir el puerto serie " << puerto << std::endl;
+        return ""; // Devolver una cadena vacía en caso de error
+    }
+
+    std::cout << "Puerto serie abierto correctamente." << std::endl;
+
+    DCB serial_options = { 0 };
+    serial_options.DCBlength = sizeof(serial_options);
+    if (!GetCommState(serial_fd, &serial_options)) {
+        std::cerr << "Error al obtener la configuración del puerto serie." << std::endl;
+        CloseHandle(serial_fd);
+        return ""; // Devolver una cadena vacía en caso de error
+    }
+    serial_options.BaudRate = CBR_115200;
+    serial_options.ByteSize = 8;
+    serial_options.StopBits = ONESTOPBIT;
+    serial_options.Parity = NOPARITY;
+    if (!SetCommState(serial_fd, &serial_options)) {
+        std::cerr << "Error al configurar el puerto serie." << std::endl;
+        CloseHandle(serial_fd);
+        return ""; // Devolver una cadena vacía en caso de error
+    } 
+
+    while (true) {
+        char buffer[256];
+        DWORD bytes_read;
+        if (ReadFile(serial_fd, buffer, sizeof(buffer), &bytes_read, NULL)) {
+            if (bytes_read > 0) {
+                std::cout << "Datos recibidos:" << std::string(buffer, bytes_read) << std::endl;
+                datosRecibidos += std::string(buffer, bytes_read); // Agregar los datos al string
+                break;
+            }
+        } else {
+            std::cerr << "Error al recibir datos por el puerto serie." << std::endl;
+            break;
+        }
+    }
+   
+    CloseHandle(serial_fd);
+
+    return datosRecibidos;
+}
+
+
 std::string floatToString(float value, int precision) {
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(precision) << value;
@@ -431,7 +500,10 @@ PYBIND11_MODULE(prueba_1, m) {
         return py::make_tuple(NAltitude, NAsimut, NRoll);
     }, "Calculates el numero de imagenes a regresar");
 
+    
+
     m.def("enviarDatosPorPuertoSerie", &enviarDatosPorPuertoSerie, "Función para enviar datos por un puerto serie.");
+    m.def("recibirDatosPorPuertoSerie", &recibirDatosPorPuertoSerie, "Función para recibe datos por un puerto serie.");
     
 }
 
