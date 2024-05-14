@@ -17,12 +17,6 @@
 
 
 
-
-
-
-
-
-
 namespace py = pybind11;
 
 
@@ -34,6 +28,7 @@ namespace py = pybind11;
 std::string floatToString(float value, int precision);
 bool enviarDatosPorPuertoSerie(const std::string& datos);
 std::string recibirDatosPorPuertoSerie();
+double radianes_a_grados(double radianes);
 
 
 
@@ -170,6 +165,7 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
         if (cont<=4)
         {
             auto q1=atan(-px/py)+3.1416;
+            auto qr=radianes_a_grados(q1);
             auto q2=px*sin(q1)-py*cos(q1)+l2; 
             //Para q3 se tiene que:
             auto q3=pz;
@@ -184,21 +180,30 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             std::string q3_str = floatToString(q3, 4);
             std::string q4_str = floatToString(q4, 4);
             std::string data = q1_str + "," + q2_str + "," + q3_str + "," + q4_str;
+
+            
+
+
             enviarDatosPorPuertoSerie(data); 
             //recibirDatosPorPuertoSerie();
             std::cout << "Datos enviados: " << data << std::endl;
             std::cout << "Datos enviados correctamente." << std::endl;
+            
             std::string datosRecibidos = recibirDatosPorPuertoSerie();
             if (!datosRecibidos.empty()) {
-                std::cout << "Datos recibidos:" << datosRecibidos << std::endl;
+                std::cout << "Datos recibidosD:" << datosRecibidos << std::endl;
+                std::cout << "Se ingreso al ciclo:" << std::endl;   
             } else {
-                std::cerr << "No se recibieron datos válidos por el puerto serie." << std::endl;
+                std::cerr << "No se recibieron datos validos por el puerto serie." << std::endl;
             }
+            
+          
         }
         
         if (cont > 4 && cont <= 8)
         {
             auto q1=atan(-px/py);
+            auto qr=radianes_a_grados(q1);
             auto q2=px*sin(q1)-py*cos(q1)+l2; 
             //Para q3 se tiene que:
             auto q3=pz;
@@ -217,12 +222,20 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             std::cout << "Datos enviados: " << data << std::endl;
             std::cout << "Datos enviados correctamente." << std::endl;
 
+
+            
+            
             std::string datosRecibidos = recibirDatosPorPuertoSerie();
             if (!datosRecibidos.empty()) {
-                std::cout << "Datos recibidos:" << datosRecibidos << std::endl;
+                std::cout << "Datos recibidosD:" << datosRecibidos << std::endl;
+                std::cout << "Se ingreso al ciclo:" << std::endl;   
             } else {
-                std::cerr << "No se recibieron datos válidos por el puerto serie." << std::endl;
+                std::cerr << "No se recibieron datos validos por el puerto serie." << std::endl;
             }
+            
+            
+          
+
         }
         
         //Para q2 se tiene que:
@@ -350,7 +363,7 @@ std::string findSerialPort(const std::string& Port) {
 
 bool enviarDatosPorPuertoSerie(const std::string& datos) {
 
-    auto Ports="\\\\.\\COM16";
+    auto Ports="\\\\.\\COM14";
     std::string puertoEspecifico = Ports; 
     std::string puerto = findSerialPort(puertoEspecifico);
     if (!puerto.empty()) {
@@ -406,7 +419,7 @@ bool enviarDatosPorPuertoSerie(const std::string& datos) {
 std::string recibirDatosPorPuertoSerie() {
     std::string datosRecibidos;
 
-    const char* puertoEspecifico = "\\\\.\\COM14"; // Cambiar a tu puerto serie específico
+    const char* puertoEspecifico = "\\\\.\\COM17"; // Cambiar a tu puerto serie específico
     std::string puerto = puertoEspecifico;
     
     HANDLE serial_fd = CreateFile(puerto.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -434,21 +447,17 @@ std::string recibirDatosPorPuertoSerie() {
         return ""; // Devolver una cadena vacía en caso de error
     } 
 
-    while (true) {
-        char buffer[256];
-        DWORD bytes_read;
-        if (ReadFile(serial_fd, buffer, sizeof(buffer), &bytes_read, NULL)) {
-            if (bytes_read > 0) {
-                std::cout << "Datos recibidos:" << std::string(buffer, bytes_read) << std::endl;
-                datosRecibidos += std::string(buffer, bytes_read); // Agregar los datos al string
-                break;
-            }
-        } else {
-            std::cerr << "Error al recibir datos por el puerto serie." << std::endl;
-            break;
+    char buffer[256];
+    DWORD bytes_read;
+    if (ReadFile(serial_fd, buffer, sizeof(buffer), &bytes_read, NULL)) {
+        if (bytes_read > 0) {
+            std::cout << "Datos recibidos:" << std::string(buffer, bytes_read) << std::endl;
+            datosRecibidos += std::string(buffer, bytes_read); // Agregar los datos al string
         }
+    } else {
+        std::cerr << "Error al recibir datos por el puerto serie." << std::endl;
+        
     }
-   
     CloseHandle(serial_fd);
 
     return datosRecibidos;
@@ -461,11 +470,10 @@ std::string floatToString(float value, int precision) {
     return ss.str();
 }
 
-
-
-
-
-
+//Funcion de  conversion
+double radianes_a_grados(double radianes) {
+    return radianes * (180.0 / M_PI);
+}
 
 
 
@@ -504,6 +512,7 @@ PYBIND11_MODULE(prueba_1, m) {
 
     m.def("enviarDatosPorPuertoSerie", &enviarDatosPorPuertoSerie, "Función para enviar datos por un puerto serie.");
     m.def("recibirDatosPorPuertoSerie", &recibirDatosPorPuertoSerie, "Función para recibe datos por un puerto serie.");
+   
     
 }
 

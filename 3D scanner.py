@@ -257,29 +257,30 @@ class App(tk.Tk):
         
     def startScan(self):
         Asimuth, Altitud, Roll, sphere_radius, selected_option, radio_var = self.frames["StartPage"].getSliderData()
+
         if Asimuth == 0 or  Altitud == 0 or Roll == 0 or sphere_radius == 0:
-            raise ValueError("Alguno de los valores es igual a cero")
+            raise ValueError("Alguno de los valores es igual a cero") 
         else:
             print(radio_var)
-            if (radio_var=="Option 1"):  # Replace 'condition' with your actual condition
-                #prueba_1.procesarDatos(Asimuth,Altitud,Roll)
-                #datos_recibidos = prueba_1.recibirDatosPorPuertoSerie()
-                #print("Datos recibidos en python:", datos_recibidos)  
-               
-                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-                self.scan.startPipeline()
+            if (radio_var=="Option 1"): 
+                prueba_1.procesarDatos(Asimuth,Altitud,Roll)
+                #Descomentar cunado la camara este en funcionamiento
+                #self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+                #self.scan.startPipeline()
                 self.frames["StartPage"].startProgress()
                 try:
                     while True:
+                        print("Si accedio al ciclo")
                         datos_recibidos = prueba_1.recibirDatosPorPuertoSerie()
                         print(repr(datos_recibidos))
                         datos_recibidos = datos_recibidos.rstrip('\x00')  # Elimina caracteres nulos del final de la cadena
+                        print(datos_recibidos)
                         if datos_recibidos == "Foto":
                             print("Los datos recibidos son exactamente 'Foto tomar foto'.")
-                            self.scan.takeFoto()
-                            self.frames["StartPage"].showImage(self.scan.giveImageArray())   
+                            #self.scan.takeFoto()
+                            #self.frames["StartPage"].showImage(self.scan.giveImageArray())   
                             print("Se capturo foto")  
-                            self.update()         
+                            #self.update()         
                         #angle = float(self.ard.giveAngle())
                         #self.frames["StartPage"].Progress(angle)               
                         #self.ard.rotate(int(self.dictionary["stepSize"]))
@@ -298,7 +299,7 @@ class App(tk.Tk):
                     print("loop is kapot") 
                     pass
                 finally:      
-                    self.scan.stopPipeline()
+                    #self.scan.stopPipeline()
                     #self.ard.close()
                     self.enablePC = True
                     #self.frames["StartPage"].stlButton.configure(bg = "#f2f2f2")      
