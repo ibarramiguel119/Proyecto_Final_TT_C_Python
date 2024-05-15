@@ -115,7 +115,7 @@ std::tuple<double, double, double> sph2cart(double azimuth, double elevation, do
 
 
 
-std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<std::vector<int>>& result, int si) {
+std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<std::vector<int>>& result, int si,py::function callback) {
     std::vector<std::vector<int>> D; 
     int n = 0;
     int l2=300; //Modificar l2 es para el tamaño del eslabon ingresarlo 
@@ -192,7 +192,10 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             std::string datosRecibidos = recibirDatosPorPuertoSerie();
             if (!datosRecibidos.empty()) {
                 std::cout << "Datos recibidosD:" << datosRecibidos << std::endl;
-                std::cout << "Se ingreso al ciclo:" << std::endl;   
+                std::cout << "Se ingreso en la logica del callback:" << std::endl;   
+                py::gil_scoped_acquire acquire;
+                callback();
+                py::gil_scoped_release release;
             } else {
                 std::cerr << "No se recibieron datos validos por el puerto serie." << std::endl;
             }
@@ -229,6 +232,9 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             if (!datosRecibidos.empty()) {
                 std::cout << "Datos recibidosD:" << datosRecibidos << std::endl;
                 std::cout << "Se ingreso al ciclo:" << std::endl;   
+                py::gil_scoped_acquire acquire;
+                callback();
+                py::gil_scoped_release release;
             } else {
                 std::cerr << "No se recibieron datos validos por el puerto serie." << std::endl;
             }
@@ -265,7 +271,7 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
 }
 
 
-void procesarDatos(int slider1Value, int slider0Value, int slider2Value) {
+void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::function callback) {
     int GAltitude, GAsimut, GRoll;
     int radioEsfera = 299;
 
@@ -310,7 +316,7 @@ void procesarDatos(int slider1Value, int slider0Value, int slider2Value) {
     std::cout << si << std::endl;
 
     ///Imprimir los datos de vector D por separado
-    CalcularPuntosCinematicaInversa(result, si); 
+    CalcularPuntosCinematicaInversa(result, si,callback); 
 }
 
 void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, int& NRoll){
@@ -363,7 +369,7 @@ std::string findSerialPort(const std::string& Port) {
 
 bool enviarDatosPorPuertoSerie(const std::string& datos) {
 
-    auto Ports="\\\\.\\COM14";
+    auto Ports="\\\\.\\COM20";
     std::string puertoEspecifico = Ports; 
     std::string puerto = findSerialPort(puertoEspecifico);
     if (!puerto.empty()) {
@@ -419,7 +425,7 @@ bool enviarDatosPorPuertoSerie(const std::string& datos) {
 std::string recibirDatosPorPuertoSerie() {
     std::string datosRecibidos;
 
-    const char* puertoEspecifico = "\\\\.\\COM17"; // Cambiar a tu puerto serie específico
+    const char* puertoEspecifico = "\\\\.\\COM14"; // Cambiar a tu puerto serie específico
     std::string puerto = puertoEspecifico;
     
     HANDLE serial_fd = CreateFile(puerto.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);

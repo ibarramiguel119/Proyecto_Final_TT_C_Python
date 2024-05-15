@@ -249,6 +249,14 @@ class App(tk.Tk):
         self.frames["StartPage"].buttonShowPC.configure(bg = "#cccccc")
         self.enablePC = False
         self.enableSaveSTL = False
+
+        #Prueba de captura de imagenes
+    def tomar_foto(self):
+        print("Tomando foto...")
+        # Aquí pones tu lógica para tomar la foto
+        
+        print("Foto tomada, enviando señal para continuar...")
+    
         
     def show_frame(self, page_name):
         '''Show a frame for the given page name'''
@@ -263,7 +271,7 @@ class App(tk.Tk):
         else:
             print(radio_var)
             if (radio_var=="Option 1"): 
-                prueba_1.procesarDatos(Asimuth,Altitud,Roll)
+                prueba_1.procesarDatos(Asimuth, Altitud, Roll, self.tomar_foto)
                 #Descomentar cunado la camara este en funcionamiento
                 #self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
                 #self.scan.startPipeline()
