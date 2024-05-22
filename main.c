@@ -21,7 +21,6 @@
 #include <string.h>  // Incluir la biblioteca de cadenas
 #include <stdbool.h>  // Incluir la biblioteca para el tipo de datos bool
 
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -41,11 +40,21 @@ uint16_t GPIO_PIN_LED = GPIO_PIN_3;     // Pin GPIO que controla el LED
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
-uint8_t rxdata[30];
+uint8_t rx_data[30];
+uint8_t rx_indx;
+uint8_t rx_bufer[100];
+uint8_t trasfer_Complit;
+
+
+
 uint8_t txdata[30]="Hola";
 uint8_t txdata1[4]="Foto";
 
+#define BUFFER_SIZE 30
 
+uint8_t rx_buffer[BUFFER_SIZE];
+volatile uint8_t rx_complete = 0;
+volatile uint16_t rx_index = 0;
 
 
 /* USER CODE END PM */
@@ -59,7 +68,7 @@ DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
-volatile bool rx_complete = false;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -114,22 +123,19 @@ int main(void)
   MX_UART4_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_DMA(&huart4,rxdata,sizeof(rxdata));
+  HAL_UART_Receive_IT(&huart4,rx_data,sizeof(rx_data));
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
-
 	  if (rx_complete) {
-	      HAL_UART_Transmit(&huart1, rxdata, sizeof(rxdata), 100);
-	      HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET);
-	      rx_complete = false;
+	      HAL_UART_Transmit(&huart1, rx_buffer, BUFFER_SIZE, 100); // Transmitir los datos recibidos por UART1
+	      rx_complete = 0; // Reiniciar la bandera de recepción completa
 	  }
 	  HAL_Delay(500);
-    /* USER CODE BEGIN 3 */
+
   }
   /* USER CODE END 3 */
 }
@@ -325,17 +331,28 @@ static void MX_GPIO_Init(void)
 	  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 }
 
-/* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart == &huart4) {
+    if (huart->Instance == UART4) {
 
-        // Encender el LED (suponiendo que está en el pin GPIO_PIN_3 del puerto GPIOE)
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET);
-        rx_complete = true;
-        // Reiniciar la recepción para esperar el siguiente paquete de datos
-        HAL_UART_Receive_DMA(&huart4, rxdata, sizeof(rxdata));
+        memcpy(rx_buffer, rx_data, BUFFER_SIZE); // Copiar los datos recibidos al buffer
+
+
+        rx_complete = 1; // Marcar que la recepción está completa
+
+
+        HAL_UART_Receive_IT(&huart4, rx_data, BUFFER_SIZE); // Reiniciar la recepción UART4
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
