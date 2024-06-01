@@ -15,6 +15,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define bufersize 1
+#define BUFFER_SIZE 256
 
 /* USER CODE END PD */
 
@@ -31,6 +33,13 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 uint8_t byte;
+volatile uint8_t buffer[BUFFER_SIZE];
+volatile uint16_t bufferIndex = 0;
+volatile uint8_t bufferOverflowFlag = 0; // Bandera para indicar desbordamiento
+
+
+
+uint8_t stringToSend[] = "Hola";  // Define la cadena que deseas enviar
 GPIO_TypeDef* GPIO_PORT_LED = GPIOE;   // Puerto GPIO donde está conectado el LED
 uint16_t GPIO_PIN_LED = GPIO_PIN_3;     // Pin GPIO que controla el LED
 /* USER COD E END PV */
@@ -41,6 +50,7 @@ static void MPU_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
+void processBuffer(uint8_t *buffer, uint16_t length);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -86,7 +96,7 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart1,&byte,1);
+  HAL_UART_Receive_IT(&huart1,&byte,bufersize);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -244,20 +254,68 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  if (huart->Instance == USART1)
-  {
-	HAL_UART_Transmit(&huart1,&byte,1,100);
+    if (huart->Instance == USART1)
+    {
+        // Almacenar el byte recibido en el buffer si no es '>'
+        if (byte != 62) // 62 es el código ASCII para '>'
+        {
+            if (bufferIndex < BUFFER_SIZE)
+            {
+                buffer[bufferIndex++] = byte;
+            }
+            else
+            {
+            	 // Manejar el caso de desbordamiento del buffer
+            	 bufferOverflowFlag = 1; // Establecer la bandera de desbordamiento
+            	 bufferIndex = 0; // Opcional: restablecer el índice del buffer
+            }
+        }
+        else
+        {
+            // Aquí puedes manejar el caso cuando se recibe '>'
+            // Por ejemplo, procesar el buffer y restablecer bufferIndex
+            processBuffer(buffer, bufferIndex);
+            bufferIndex = 0;
+        }
 
-    HAL_UART_Receive_IT(&huart1, &byte,1);  // Rehabilitar la recepción por interrupción
-
-    if(byte==97){
-       HAL_GPIO_WritePin(GPIO_PORT_LED, GPIO_PIN_LED, GPIO_PIN_SET);
+        // Vuelve a habilitar la recepción por interrupción
+        HAL_UART_Receive_IT(&huart1, &byte, 1);
     }
-    if(byte==101){
-       HAL_GPIO_WritePin(GPIO_PORT_LED, GPIO_PIN_LED, GPIO_PIN_RESET);
-    }
-  }
 }
+
+
+void processBuffer(uint8_t *buffer, uint16_t length)
+{
+	if (bufferOverflowFlag)
+	{
+	   // Manejar el desbordamiento del buffer
+	   // Por ejemplo, enviar un mensaje de error o realizar acciones correctivas
+	      HAL_UART_Transmit(&huart1, (uint8_t *)"Buffer overflow\n", 16, 100);
+	      bufferOverflowFlag = 0; // Restablecer la bandera de desbordamiento
+	}
+    // Ejemplo de procesamiento del buffer
+    // Aquí puedes enviar la cadena o realizar cualquier otra acción
+    HAL_UART_Transmit(&huart1,buffer, length, 100); // Enviar el contenido del buffer
+
+    // Controlar los LEDs según los datos del buffer
+    for (uint16_t i = 0; i < length; i++)
+    {
+        if (buffer[i] == 97) // ASCII code for 'a'
+        {
+            HAL_GPIO_WritePin(GPIO_PORT_LED, GPIO_PIN_LED, GPIO_PIN_SET);
+        }
+        else if (buffer[i] == 101) // ASCII code for 'e'
+        {
+            HAL_GPIO_WritePin(GPIO_PORT_LED, GPIO_PIN_LED, GPIO_PIN_RESET);
+        }
+    }
+}
+
+
+
+
+
+
 /* USER CODE END 4 */
 
  /* MPU Configuration */
