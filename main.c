@@ -288,50 +288,55 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 }
 
 
+
 void processBuffer(uint8_t *buffer, uint16_t length)
 {
-	if (bufferOverflowFlag)
-	{
-	   // Manejar el desbordamiento del buffer
-	   // Por ejemplo, enviar un mensaje de error o realizar acciones correctivas
-	      HAL_UART_Transmit(&huart1, (uint8_t *)"Buffer overflow\n", 16, 100);
-	      bufferOverflowFlag = 0; // Restablecer la bandera de desbordamiento
-	}
-    // Ejemplo de procesamiento del buffer
-    // Aquí puedes enviar la cadena o realizar cualquier otra acción
-    //HAL_UART_Transmit(&huart1,buffer, length, 100); // Enviar el contenido del buffer
-
-
-    if(length>=6){
-    	// Definir variables para almacenar cada parte
-    	        char q1[7], q2[5], q3[5], q4[5];
-
-    	        // Copiar cada parte del buffer en su respectiva variable
-    	        strncpy(q1, buffer, 6);
-    	        q1[5] = '\0'; // Asegurar que q1 sea una cadena de caracteres válida
-
-    	        strncpy(q2, buffer + 4, 4);
-    	        q2[4] = '\0'; // Asegurar que q2 sea una cadena de caracteres válida
-
-    	        strncpy(q3, buffer + 8, 4);
-    	        q3[4] = '\0'; // Asegurar que q3 sea una cadena de caracteres válida
-
-    	        strncpy(q4, buffer + 12, 4);
-    	        q4[4] = '\0'; // Asegurar que q4 sea una cadena de caracteres válida
-
-    	        // Enviar cada parte a través de UART para verificar
-    	        HAL_UART_Transmit(&huart1, (uint8_t *)q1, strlen(q1), 100);
-    	        //HAL_UART_Transmit(&huart1, (uint8_t *)q2, strlen(q2), 100);
-    	        //HAL_UART_Transmit(&huart1, (uint8_t *)q3, strlen(q3), 100);
-    	        //HAL_UART_Transmit(&huart1, (uint8_t *)q4, strlen(q4), 100);
-
+    if (bufferOverflowFlag)
+    {
+        // Manejar el desbordamiento del buffer
+        // Por ejemplo, enviar un mensaje de error o realizar acciones correctivas
+        HAL_UART_Transmit(&huart1, (uint8_t *)"Buffer overflow\n", 16, 100);
+        bufferOverflowFlag = 0; // Restablecer la bandera de desbordamiento
+        return;
     }
 
+    // Variables para almacenar las partes separadas
+    char q1[BUFFER_SIZE] = {0};
+    char q2[BUFFER_SIZE] = {0};
+    char q3[BUFFER_SIZE] = {0};
+    char q4[BUFFER_SIZE] = {0};
 
-    // Controlar los LEDs según los datos del buffer
+    // Punteros para la división de la cadena
+    char *ptr = (char *)buffer;
+    char *start = ptr;
+    char *end = strchr(start, 'a');
+
+    if (end != NULL) {
+        strncpy(q1, start, end - start);
+        start = end + 1;
+        end = strchr(start, 'b');
+
+        if (end != NULL) {
+            strncpy(q2, start, end - start);
+            start = end + 1;
+            end = strchr(start, 'c');
+
+            if (end != NULL) {
+                strncpy(q3, start, end - start);
+                start = end + 1;
+                strcpy(q4, start);
+            }
+        }
+    }
+
+    // Enviar cada parte a través de UART para verificar
+    //HAL_UART_Transmit(&huart1, (uint8_t *)q1, strlen(q1), 100);0 puntos desfazados
+    //HAL_UART_Transmit(&huart1, (uint8_t *)q2, strlen(q2), 100); 5 puntos desfazados
+    //HAL_UART_Transmit(&huart1, (uint8_t *)q3, strlen(q3), 100); 2 puntos malos
+    HAL_UART_Transmit(&huart1, (uint8_t *)q4, strlen(q4), 100);
+
 
 }
-
 
 
 
