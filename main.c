@@ -2,6 +2,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -33,9 +37,9 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 uint8_t byte;
-volatile uint8_t buffer[BUFFER_SIZE];
-volatile uint16_t bufferIndex = 0;
-volatile uint8_t bufferOverflowFlag = 0; // Bandera para indicar desbordamiento
+uint8_t buffer[BUFFER_SIZE];
+uint16_t bufferIndex = 0;
+uint8_t bufferOverflowFlag = 0; // Bandera para indicar desbordamiento
 
 
 
@@ -295,20 +299,37 @@ void processBuffer(uint8_t *buffer, uint16_t length)
 	}
     // Ejemplo de procesamiento del buffer
     // Aquí puedes enviar la cadena o realizar cualquier otra acción
-    HAL_UART_Transmit(&huart1,buffer, length, 100); // Enviar el contenido del buffer
+    //HAL_UART_Transmit(&huart1,buffer, length, 100); // Enviar el contenido del buffer
+
+
+    if(length>=6){
+    	// Definir variables para almacenar cada parte
+    	        char q1[7], q2[5], q3[5], q4[5];
+
+    	        // Copiar cada parte del buffer en su respectiva variable
+    	        strncpy(q1, buffer, 6);
+    	        q1[5] = '\0'; // Asegurar que q1 sea una cadena de caracteres válida
+
+    	        strncpy(q2, buffer + 4, 4);
+    	        q2[4] = '\0'; // Asegurar que q2 sea una cadena de caracteres válida
+
+    	        strncpy(q3, buffer + 8, 4);
+    	        q3[4] = '\0'; // Asegurar que q3 sea una cadena de caracteres válida
+
+    	        strncpy(q4, buffer + 12, 4);
+    	        q4[4] = '\0'; // Asegurar que q4 sea una cadena de caracteres válida
+
+    	        // Enviar cada parte a través de UART para verificar
+    	        HAL_UART_Transmit(&huart1, (uint8_t *)q1, strlen(q1), 100);
+    	        //HAL_UART_Transmit(&huart1, (uint8_t *)q2, strlen(q2), 100);
+    	        //HAL_UART_Transmit(&huart1, (uint8_t *)q3, strlen(q3), 100);
+    	        //HAL_UART_Transmit(&huart1, (uint8_t *)q4, strlen(q4), 100);
+
+    }
+
 
     // Controlar los LEDs según los datos del buffer
-    for (uint16_t i = 0; i < length; i++)
-    {
-        if (buffer[i] == 97) // ASCII code for 'a'
-        {
-            HAL_GPIO_WritePin(GPIO_PORT_LED, GPIO_PIN_LED, GPIO_PIN_SET);
-        }
-        else if (buffer[i] == 101) // ASCII code for 'e'
-        {
-            HAL_GPIO_WritePin(GPIO_PORT_LED, GPIO_PIN_LED, GPIO_PIN_RESET);
-        }
-    }
+
 }
 
 
