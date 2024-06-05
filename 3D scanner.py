@@ -50,7 +50,7 @@ class Arduino():
             
     def waitForRotation(self):
         while True:
-            self.data = str(self.s.readline())
+            self.data = str(self.s.readline()) 
             if self.data != "b''":
                 self.currentstep += self.steps 
                 if int(str(self.data)[2:len(self.data)-1]) != self.steps:
@@ -65,19 +65,6 @@ class Arduino():
         
     def close(self):
         self.s.close()
-
-
-
-class Microcontrolador():
-    def __init__(self,com_port,baud_rate,timeout):
-        self.com_port = com_port
-        self.baud_rate = baud_rate
-        self.timeout = timeout
-        self.angle_total = 0
-        self.s = serial.Serial(self.com_port,self.baud_rate,timeout = self.timeout)
-        time.sleep(2)
-        self.currentstep = 0        
-    
     
 
 
@@ -251,11 +238,23 @@ class App(tk.Tk):
         self.enableSaveSTL = False
 
         #Prueba de captura de imagenes
-    def tomar_foto(self):
+    def tomar_foto(self,q1):
         print("Tomando foto...")
-        # Aquí pones tu lógica para tomar la foto
-        
+        print(q1)
+
         print("Foto tomada, enviando señal para continuar...")
+        #Descomentar cuando la camara este en funcionamiento
+        self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+        self.scan.startPipeline()
+        self.scan.takeFoto()
+        self.frames["StartPage"].showImage(self.scan.giveImageArray())    
+        angle = 30.15
+        #self.frames["StartPage"].Progress(angle)               
+        #self.ard.rotate(int(self.dictionary["stepSize"]))
+        self.scan.processFoto(angle)
+        #self.ard.waitForRotation()    
+        self.update()
+       
     
         
     def show_frame(self, page_name):
@@ -271,23 +270,24 @@ class App(tk.Tk):
         else:
             print(radio_var)
             if (radio_var=="Option 1"): 
-                prueba_1.procesarDatos(Asimuth, Altitud, Roll, self.tomar_foto)
+                prueba_1.procesarDatos(Altitud, Asimuth, Roll, lambda q1: self.tomar_foto(q1))
+                print('se termino de ejectar la funcion ')
                 #Descomentar cunado la camara este en funcionamiento
                 #self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
                 #self.scan.startPipeline()
-                self.frames["StartPage"].startProgress()
-                try:
-                    while True:
-                        print("Si accedio al ciclo")
-                        datos_recibidos = prueba_1.recibirDatosPorPuertoSerie()
-                        print(repr(datos_recibidos))
-                        datos_recibidos = datos_recibidos.rstrip('\x00')  # Elimina caracteres nulos del final de la cadena
-                        print(datos_recibidos)
-                        if datos_recibidos == "Foto":
-                            print("Los datos recibidos son exactamente 'Foto tomar foto'.")
+                #self.frames["StartPage"].startProgress()
+                #try:
+                    #while True:
+                        #print("Si accedio al ciclo")
+                        
+                        
+                        #datos_recibidos = datos_recibidos.rstrip('\x00')  # Elimina caracteres nulos del final de la cadena
+                        #print(datos_recibidos)
+                        #if datos_recibidos == "Foto":
+                            #print("Los datos recibidos son exactamente 'Foto tomar foto'.")
                             #self.scan.takeFoto()
                             #self.frames["StartPage"].showImage(self.scan.giveImageArray())   
-                            print("Se capturo foto")  
+                            #print("Se capturo foto")  
                             #self.update()         
                         #angle = float(self.ard.giveAngle())
                         #self.frames["StartPage"].Progress(angle)               
@@ -303,15 +303,15 @@ class App(tk.Tk):
                         #if keyboard.is_pressed('q'):
                             #print("hij stopt")
                             #break
-                except:
-                    print("loop is kapot") 
-                    pass
-                finally:      
+                #except:
+                    #print("loop is kapot") 
+                    #pass
+                #finally:      
                     #self.scan.stopPipeline()
                     #self.ard.close()
-                    self.enablePC = True
+                    #self.enablePC = True
                     #self.frames["StartPage"].stlButton.configure(bg = "#f2f2f2")      
-                    self.frames["StartPage"].buttonShowPC.configure(bg = "#f2f2f2")
+                    #self.frames["StartPage"].buttonShowPC.configure(bg = "#f2f2f2")
 
             else:
                 if (selected_option=="Option 36"):
