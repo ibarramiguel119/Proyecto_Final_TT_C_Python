@@ -244,16 +244,20 @@ class App(tk.Tk):
 
         print("Foto tomada, enviando señal para continuar...")
         #Descomentar cuando la camara este en funcionamiento
-        self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-        self.scan.startPipeline()
         self.scan.takeFoto()
         self.frames["StartPage"].showImage(self.scan.giveImageArray())    
-        angle = 30.15
+        angle=q1
+        print("Se ejecuto el angulo")
+        print(angle)
         #self.frames["StartPage"].Progress(angle)               
         #self.ard.rotate(int(self.dictionary["stepSize"]))
         self.scan.processFoto(angle)
         #self.ard.waitForRotation()    
         self.update()
+        
+
+
+   
        
     
         
@@ -270,6 +274,8 @@ class App(tk.Tk):
         else:
             print(radio_var)
             if (radio_var=="Option 1"): 
+                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+                self.scan.startPipeline()
                 prueba_1.procesarDatos(Altitud, Asimuth, Roll, lambda q1: self.tomar_foto(q1))
                 print('se termino de ejectar la funcion ')
                 #Descomentar cunado la camara este en funcionamiento
