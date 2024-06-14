@@ -42,12 +42,15 @@
 #define VALOR_0 65
 #define VALOR_PI 300
 
+#define VALOR_0r 65
+#define VALOR_PIr 300
+
 #define ENABLE_PIN GPIO_PIN_3
 #define MS0_PIN GPIO_PIN_5
 #define MS1_PIN GPIO_PIN_1
 #define MS2_PIN GPIO_PIN_3
 
-
+#define VELOCIDAD 0.5
 
 #define bufersize 1
 #define BUFFER_SIZE 256
@@ -94,13 +97,18 @@ volatile uint8_t UASART = 0;
 
 
 uint32_t radianes_a_valor(float radianes) {
+    // Ajusta los radianes negativos a su equivalente positivo en el rango de 0 a 2PI
+    if (radianes < 0) {
+        radianes +=  M_PI;
+    }
+
     // Normaliza el valor de radianes en el rango de 0 a PI
-    if (radianes < 0) radianes = 0;
-    if (radianes > M_PI) radianes = M_PI;
+    if (radianes > M_PI) {
+        radianes = M_PI;
+    }
 
-    return VALOR_0 + (uint32_t)((VALOR_PI - VALOR_0) * (radianes / M_PI));
+    return VALOR_0r + (uint32_t)((VALOR_PIr - VALOR_0r) * (radianes / M_PI));
 }
-
 uint32_t milimetros_a_pasos(float milimetros) {
     // Calcular el número de pasos necesarios para mover la distancia en milímetros
     float pasos_por_mm = 200.0 / 8.0; // 200 pasos por 8 mm
@@ -112,6 +120,8 @@ uint32_t milimetros_a_pasos(float milimetros) {
 /* USER CODE BEGIN 4 */
 volatile uint8_t motor_running = 1;// Variable to control motor state
 volatile uint8_t motor_running1 = 1;
+
+volatile int pasos_retroceso = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == GPIO_PIN_12) {
@@ -770,12 +780,66 @@ void A4988_Setup() {
 
 void Home (void){
 	TIM1->CCR4 = 183;
-	TIM1->CCR2 =300;
+	TIM1->CCR2 =183;
 	mover_motorq1(0);
 	motor_control();
 	motor_control1();
 }
 
+void motor_control(void) {
+	int pasos_retroceso_local = 0;
+    while (motor_running) {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
+        for (int i = 0; i < 1000 && motor_running; i++) {
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+            HAL_Delay(VELOCIDAD);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+            HAL_Delay(VELOCIDAD);
+        }
+        if (!motor_running) break; // Check if motor_running is false
+
+        HAL_Delay(500);
+    }
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+    for (int i = 0; i < 2500; i++) {
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    	HAL_Delay(VELOCIDAD);
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    	HAL_Delay(VELOCIDAD);
+    	pasos_retroceso_local++;
+    }
+    HAL_Delay(500);
+    pasos_retroceso += pasos_retroceso_local;
+    motor_running = 1;
+}
+
+void motor_control1(void) {
+    while (motor_running1) {
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
+        for (int i = 0; i < 1000 && motor_running1; i++) {
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
+            HAL_Delay(VELOCIDAD);
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
+            HAL_Delay(VELOCIDAD);
+        }
+        HAL_Delay(10);
+        if (!motor_running1) break; // Check if motor_running is false
+        HAL_Delay(500);
+
+    }
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET);
+    for (int i = 0; i < 70; i++) {
+    	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
+    	HAL_Delay(VELOCIDAD);
+    	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
+    	HAL_Delay(VELOCIDAD);
+    }
+    HAL_Delay(500);
+
+    motor_running1 = 1;
+}
 
 void mover_motorq1(float radianes) {
     // Convertir radianes a pasos
@@ -792,9 +856,9 @@ void mover_motorq1(float radianes) {
         HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
         for (int i = 0; i < diferencia_pasos; i++) {
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
         }
     } else if (diferencia_pasos < 0) {
         // Movimiento hacia atrás
@@ -802,9 +866,9 @@ void mover_motorq1(float radianes) {
         diferencia_pasos = -diferencia_pasos; // Hacer positiva la diferencia para el bucle
         for (int i = 0; i < diferencia_pasos; i++) {
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
         }
     }
 
@@ -814,69 +878,19 @@ void mover_motorq1(float radianes) {
     HAL_Delay(1000);
 }
 
-void motor_control(void) {
-    while (motor_running) {
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
-        for (int i = 0; i < 1000 && motor_running; i++) {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-            HAL_Delay(1);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-            HAL_Delay(1);
-        }
-        if (!motor_running) break; // Check if motor_running is false
-
-        HAL_Delay(500);
-    }
-
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
-    for (int i = 0; i < 70; i++) {
-    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    	HAL_Delay(1);
-    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-    	HAL_Delay(1);
-    }
-    HAL_Delay(500);
-    motor_running = 1;
-}
-
-void motor_control1(void) {
-    while (motor_running1) {
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
-        for (int i = 0; i < 1000 && motor_running1; i++) {
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
-            HAL_Delay(1);
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-            HAL_Delay(1);
-        }
-        HAL_Delay(10);
-        if (!motor_running1) break; // Check if motor_running is false
-        HAL_Delay(500);
-
-    }
-
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET);
-    for (int i = 0; i < 70; i++) {
-    	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
-    	HAL_Delay(1);
-    	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-    	HAL_Delay(1);
-    }
-    HAL_Delay(500);
-
-    motor_running1 = 1;
-}
-
-
 void mover_motorq2_mm(float milimetros) {
     // Limitar el rango de movimiento entre 0 y 200 mm
     if (milimetros < 0) {
         milimetros = 0;
-    } else if (milimetros > 150) {
-        milimetros = 150;
+    } else if (milimetros > 60) {
+        milimetros = 60;
     }
 
     // Convertir milímetros a pasos
     uint32_t pasos = milimetros_a_pasos(milimetros);
+
+    pasos -= pasos_retroceso; // Restar los pasos de retroceso del total
+    pasos_retroceso = 0;
 
     // Calcular la diferencia de pasos respecto a la posición actual
     int diferencia_pasos = pasos - paso_actual_q2;
@@ -894,9 +908,9 @@ void mover_motorq2_mm(float milimetros) {
         // Mover el motor la cantidad de pasos necesarios
         for (int i = 0; i < diferencia_pasos; i++) {
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
         }
 
         // Actualizar el paso actual
@@ -933,9 +947,9 @@ void mover_motorq3_mm(float milimetros) {
         HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET); // Dirección positiva
         for (int i = 0; i < diferencia_pasos; i++) {
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
         }
     } else if (diferencia_pasos < 0) {
         // Movimiento hacia atrás
@@ -943,9 +957,9 @@ void mover_motorq3_mm(float milimetros) {
         diferencia_pasos = -diferencia_pasos; // Hacer positiva la diferencia para el bucle
         for (int i = 0; i < diferencia_pasos; i++) {
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-            HAL_Delay(1);
+            HAL_Delay(VELOCIDAD);
         }
     }
 
