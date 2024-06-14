@@ -276,48 +276,10 @@ class App(tk.Tk):
             if (radio_var=="Option 1"): 
                 self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
                 self.scan.startPipeline()
-                prueba_1.procesarDatos(Altitud, Asimuth, Roll, lambda q1: self.tomar_foto(q1))
-                print('se termino de ejectar la funcion ')
-                #Descomentar cunado la camara este en funcionamiento
-                #self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-                #self.scan.startPipeline()
-                #self.frames["StartPage"].startProgress()
-                #try:
-                    #while True:
-                        #print("Si accedio al ciclo")
-                        
-                        
-                        #datos_recibidos = datos_recibidos.rstrip('\x00')  # Elimina caracteres nulos del final de la cadena
-                        #print(datos_recibidos)
-                        #if datos_recibidos == "Foto":
-                            #print("Los datos recibidos son exactamente 'Foto tomar foto'.")
-                            #self.scan.takeFoto()
-                            #self.frames["StartPage"].showImage(self.scan.giveImageArray())   
-                            #print("Se capturo foto")  
-                            #self.update()         
-                        #angle = float(self.ard.giveAngle())
-                        #self.frames["StartPage"].Progress(angle)               
-                        #self.ard.rotate(int(self.dictionary["stepSize"]))
-                        #self.scan.processFoto(angle)
-                        #self.ard.waitForRotation()    
-                        #self.update()
-                        #if angle >= 360:
-                            #print("de cirkel is rond!")
-                            #self.frames["StartPage"].endProgress()
-                            #break
-                        
-                        #if keyboard.is_pressed('q'):
-                            #print("hij stopt")
-                            #break
-                #except:
-                    #print("loop is kapot") 
-                    #pass
-                #finally:      
-                    #self.scan.stopPipeline()
-                    #self.ard.close()
-                    #self.enablePC = True
-                    #self.frames["StartPage"].stlButton.configure(bg = "#f2f2f2")      
-                    #self.frames["StartPage"].buttonShowPC.configure(bg = "#f2f2f2")
+                prueba_1.procesarDatos(Altitud, Asimuth,Roll,sphere_radius, lambda q1: self.tomar_foto(q1))
+                print('se termino de ejectar la funcion de los datos  ')
+                self.scan.stopPipeline()
+                self.enablePC = True
 
             else:
                 if (selected_option=="Option 36"):
@@ -331,10 +293,10 @@ class App(tk.Tk):
 
 
 
-        self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
-        self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-        self.scan.startPipeline()
-        self.frames["StartPage"].startProgress()
+        #self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
+        #self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+        #self.scan.startPipeline()
+        #self.frames["StartPage"].startProgress()
         
         try:
             while True:
@@ -441,13 +403,13 @@ class StartPage(tk.Frame):
         self.sliderAltitude = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
         self.sliderAltitude.grid(sticky="W", row=1, column=1, pady=5, padx=10)
 
-        label3 = tk.Label(self.buttonFrame, text="Posicion Roll")
+        label3 = tk.Label(self.buttonFrame, text="Radio de la esfera")
         label3.grid(sticky="W", row=2, column=0, pady=5, padx=10)
-        self.sliderRoll = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderRoll = tk.Scale(self.buttonFrame, from_=0, to=270, orient='horizontal', length=200)
         self.sliderRoll.grid(sticky="W", row=2, column=1, pady=5, padx=10)
 
         
-        label4 = tk.Label(self.buttonFrame, text="Radio de la esfera")
+        label4 = tk.Label(self.buttonFrame, text="Radio de la Roll")
         label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
         self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
         self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
@@ -573,7 +535,7 @@ class SettingsPage(tk.Frame):
         self.e1 = SettingsEntry(self.BasicSettingsFrame,"Step size: ",var = self.controller.dictionary["stepSize"])
         self.e2 = SettingsEntry(self.BasicSettingsFrame,"Frame width: ",var = self.controller.dictionary["widthFrame"])
         self.e3 = SettingsEntry(self.BasicSettingsFrame,"Frame height: ",var = self.controller.dictionary["heightFrame"])
-        self.e4 = SettingsEntry(self.BasicSettingsFrame,"COM port Arduino: ",var = self.controller.dictionary["COMport"])
+        #self.e4 = SettingsEntry(self.BasicSettingsFrame,"COM port Arduino: ",var = self.controller.dictionary["COMport"])
         self.e5 = SettingsEntry(self.BasicSettingsFrame,"Baudrate Arduino: ",var = self.controller.dictionary["baudrate"])
         
         self.BasicSettingsFrame.pack(side = "left",fill="both")#fill="both", expand="yes"
@@ -590,7 +552,7 @@ class SettingsPage(tk.Frame):
     def enterSettings(self):
         self.controller.dictionary["stepSize"] = self.e1.get()
         self.controller.dictionary["widthFrame"] = self.e2.get()
-        self.controller.dictionary["heightFrame"] = self.e3.get()
+        #self.controller.dictionary["heightFrame"] = self.e3.get()
         self.controller.dictionary["COMport"] = self.e4.get()
         self.controller.dictionary["baudrate"] = self.e5.get()
         self.controller.dictionary["k_points"] = self.e6.get()
@@ -612,7 +574,7 @@ class SettingsPage(tk.Frame):
         self.e1.insert(self.controller.dictionary["stepSize"])
         self.e2.insert(self.controller.dictionary["widthFrame"])
         self.e3.insert(self.controller.dictionary["heightFrame"])
-        self.e4.insert(self.controller.dictionary["COMport"])
+        #self.e4.insert(self.controller.dictionary["COMport"])
         self.e5.insert(self.controller.dictionary["baudrate"])
         self.e6.insert(self.controller.dictionary["k_points"])
         self.e7.insert(self.controller.dictionary["std_ratio"])
