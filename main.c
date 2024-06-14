@@ -99,7 +99,7 @@ volatile uint8_t UASART = 0;
 uint32_t radianes_a_valor(float radianes) {
     // Ajusta los radianes negativos a su equivalente positivo en el rango de 0 a 2PI
     if (radianes < 0) {
-        radianes +=  M_PI;
+        radianes +=2.87979;
     }
 
     // Normaliza el valor de radianes en el rango de 0 a PI
@@ -789,7 +789,7 @@ void Home (void){
 void motor_control(void) {
 	int pasos_retroceso_local = 0;
     while (motor_running) {
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
         for (int i = 0; i < 1000 && motor_running; i++) {
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
             HAL_Delay(VELOCIDAD);
@@ -801,7 +801,7 @@ void motor_control(void) {
         HAL_Delay(500);
     }
 
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);
     for (int i = 0; i < 2500; i++) {
     	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
     	HAL_Delay(VELOCIDAD);
