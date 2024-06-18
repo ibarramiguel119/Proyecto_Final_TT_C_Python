@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
+  **************************
   * @file           : main.c
   * @brief          : Main program body
-  ******************************************************************************
+  **************************
   * @attention
   *
   * Copyright (c) 2024 STMicroelectronics.
@@ -13,7 +13,7 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
-  ******************************************************************************
+  **************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -99,7 +99,7 @@ volatile uint8_t UASART = 0;
 uint32_t radianes_a_valor(float radianes) {
     // Ajusta los radianes negativos a su equivalente positivo en el rango de 0 a 2PI
     if (radianes < 0) {
-        radianes +=2.87979;
+        radianes +=3.1416;
     }
 
     // Normaliza el valor de radianes en el rango de 0 a PI
@@ -134,7 +134,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 int paso_actual_q1 = 0;
-int paso_actual_q2 = 0;
+int paso_actual_q2 = 4250;
 int paso_actual_q3 = 0;
 
 float q1_float;
@@ -337,12 +337,23 @@ int main(void)
   while (1)
   {
 
-	     q1_float = atof(q1);
-	     q4_float = atof(q4);
+	     //q1_float = atof(q1);
+	     q1_float = 1.57;
+	     q4_float = 2.2;
 
 	      	// Conversión de q2 y q3 a int (truncando los valores decimales)
-	     q2_int = (int)atof(q2);
-	     q3_int = (int)atof(q3);
+	     //q2_int = (int)atof(q2);
+	     q2_int =200;
+	     q3_int =220;
+
+	     //q1_float = atof(q1);
+
+
+	      	// Conversión de q2 y q3 a int (truncando los valores decimales)
+	     //q2_int = (int)atof(q2);
+	     //q3_int = (int)atof(q3);
+	     q4_float =1.5;
+
 
 	     mover_motorq1(q1_float);
 	     mover_motorq2_mm(q2_int);
@@ -678,8 +689,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     if (huart->Instance == USART1)
     {
         //HAL_GPIO_WritePin(GPIOE, GPIO_PIN_LED, GPIO_PIN_SET); // Enciende el LED
-        //HAL_UART_Transmit(&huart1,&byte,1, 100); // Envía la cadena a través de UART
-
+        HAL_UART_Transmit(&huart1,&byte,1, 100); // Envía la cadena a través de UART
 
         // Almacenar el byte recibido en el buffer si no es '>'
         if (byte != 62) // 62 es el código ASCII para '>'
@@ -779,7 +789,7 @@ void A4988_Setup() {
 }
 
 void Home (void){
-	TIM1->CCR4 = 183;
+	TIM1->CCR4 = 180;
 	TIM1->CCR2 =183;
 	mover_motorq1(0);
 	motor_control();
@@ -787,7 +797,6 @@ void Home (void){
 }
 
 void motor_control(void) {
-	int pasos_retroceso_local = 0;
     while (motor_running) {
         HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
         for (int i = 0; i < 1000 && motor_running; i++) {
@@ -807,10 +816,10 @@ void motor_control(void) {
     	HAL_Delay(VELOCIDAD);
     	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
     	HAL_Delay(VELOCIDAD);
-    	pasos_retroceso_local++;
+
+    	paso_actual_q2--;
     }
     HAL_Delay(500);
-    pasos_retroceso += pasos_retroceso_local;
     motor_running = 1;
 }
 
@@ -880,17 +889,15 @@ void mover_motorq1(float radianes) {
 
 void mover_motorq2_mm(float milimetros) {
     // Limitar el rango de movimiento entre 0 y 200 mm
+	milimetros=milimetros-100;
     if (milimetros < 0) {
         milimetros = 0;
-    } else if (milimetros > 60) {
-        milimetros = 60;
+    } else if (milimetros > 170) {
+        milimetros = 170;
     }
 
     // Convertir milímetros a pasos
     uint32_t pasos = milimetros_a_pasos(milimetros);
-
-    pasos -= pasos_retroceso; // Restar los pasos de retroceso del total
-    pasos_retroceso = 0;
 
     // Calcular la diferencia de pasos respecto a la posición actual
     int diferencia_pasos = pasos - paso_actual_q2;
@@ -919,11 +926,6 @@ void mover_motorq2_mm(float milimetros) {
 
     HAL_Delay(1000); // Pequeña pausa después de mover el motor
 }
-
-
-
-
-
 
 void mover_motorq3_mm(float milimetros) {
     // Limitar el rango de movimiento entre 0 y 200 mm
