@@ -68,9 +68,8 @@ class Arduino():
     
 
 
-class  Scan(): 
-    def __init__(self,width,height,framerate,autoexposureFrames,backDistance):
-       
+class Scan(): 
+    def __init__(self, width, height, framerate, autoexposureFrames, backDistance):
         self.width = width
         self.height = height
         self.framerate = framerate
@@ -83,18 +82,18 @@ class  Scan():
         self.config.enable_stream(rs.stream.color, self.width, self.height, rs.format.any, self.framerate)
         self.config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.any, self.framerate)
         
-        #post-processing filters
-        self.depth_to_disparity =  rs.disparity_transform(True)
+        # Post-processing filters
+        self.depth_to_disparity = rs.disparity_transform(True)
         self.disparity_to_depth = rs.disparity_transform(False)
         self.dec_filter = rs.decimation_filter()
         self.temp_filter = rs.temporal_filter()
         self.spat_filter = rs.spatial_filter()
         self.hole_filter = rs.hole_filling_filter()
-        self.threshold = rs.threshold_filter(0.17,0.4)
+        self.threshold = rs.threshold_filter(0.17, 0.4)
         
-        self.dtr = np.pi/180
-        self.distance = 0.258 - self.backDistance
-        self.bbox = o3d.geometry.AxisAlignedBoundingBox((-0.13,-0.13,0),(0.13,0.13,0.2))
+        self.dtr = np.pi / 180
+        self.distance = 0.425 - self.backDistance
+        self.bbox = o3d.geometry.AxisAlignedBoundingBox((-0.13, -0.13, 0), (0.13, 0.13, 0.2))
         
     def startPipeline(self):
         self.pipe.start(self.config)
@@ -105,40 +104,29 @@ class  Scan():
         self.pipe.stop()
         self.pipe = None
         self.config = None
-        print(" Paro de pipeline")
+        print("Paro de pipeline")
         
     def takeFoto(self):
-        print("foto tomada con exito!")
+        print("Foto tomada con éxito!")
         for i in range(self.autoexposureFrames):
             self.frameset = self.pipe.wait_for_frames()
         
-        # neem de foto
         self.frameset = self.pipe.wait_for_frames()
         self.frameset = self.align.process(self.frameset)
         self.profile = self.frameset.get_profile()
         self.depth_intrinsics = self.profile.as_video_stream_profile().get_intrinsics()
         self.w, self.h = self.depth_intrinsics.width, self.depth_intrinsics.height
-        self.fx, self.fy = self.depth_intrinsics.fx,self.depth_intrinsics.fy
-        self.px, self.py = self.depth_intrinsics.ppx,self.depth_intrinsics.ppy
-        
+        self.fx, self.fy = self.depth_intrinsics.fx, self.depth_intrinsics.fy
+        self.px, self.py = self.depth_intrinsics.ppx, self.depth_intrinsics.ppy
         
         self.color_frame = self.frameset.get_color_frame()
         self.depth_frame = self.frameset.get_depth_frame()
-
-        # self.depth_frame = self.threshold.process(self.depth_frame)			
-        # self.depth_frame = self.depth_to_disparity.process(self.depth_frame)
-        # self.depth_frame = self.dec_filter.process(self.depth_frame)
-        # self.depth_frame = self.temp_filter.process(self.depth_frame)
-        # self.depth_frame = self.spat_filter.process(self.depth_frame)
-        # self.depth_frame = self.disparity_to_depth.process(self.depth_frame)
-        # self.depth_frame = self.hole_filter.process(self.depth_frame)
-        # self.depth_frame = self.depth_frame.as_depth_frame()
         
-        self.intrinsic = o3d.camera.PinholeCameraIntrinsic(self.w,self.h,self.fx,self.fy,self.px,self.py)
+        self.intrinsic = o3d.camera.PinholeCameraIntrinsic(self.w, self.h, self.fx, self.fy, self.px, self.py)
         self.depth_image = np.asanyarray(self.depth_frame.get_data())
         self.color_image = np.asanyarray(self.color_frame.get_data())
         
-    def processFoto(self,angle):
+    def processFoto(self, angle):
         print(angle)
         self.angle = angle
         self.depth_frame_open3d = o3d.geometry.Image(self.depth_image)
@@ -146,16 +134,27 @@ class  Scan():
 
         self.rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(self.color_frame_open3d, self.depth_frame_open3d, convert_rgb_to_intensity=False)
         self.pcd = o3d.geometry.PointCloud.create_from_rgbd_image(self.rgbd_image, self.intrinsic)
-        self.pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1,max_nn=30))
+        self.pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
         self.pcd.orient_normals_towards_camera_location(camera_location=np.array([0., 0., 0.]))
         self.getcameraLocation()
         self.rMatrix()
         self.pcd.rotate(self.R, (0, 0, 0))
-        self.pcd.translate((self.x,self.y,self.z))
+        self.pcd.translate((self.x, self.y, self.z))
         self.pcd = self.pcd.crop(self.bbox)
-        self.pcd, self.ind = self.pcd.remove_statistical_outlier(nb_neighbors=100,std_ratio=2)
-        self.main_pcd = self.main_pcd + self.pcd
-       
+        self.pcd, self.ind = self.pcd.remove_statistical_outlier(nb_neighbors=100, std_ratio=2)
+        
+        if len(self.main_pcd.points) > 0:
+            transformation, fitness, inlier_rmse = self.applyICP(self.pcd, self.main_pcd)
+            self.pcd.transform(transformation)
+            
+            # Guarda la nube de puntos transformada y las métricas
+            if not hasattr(self, 'all_transformations'):
+                self.all_transformations = []
+            self.all_transformations.append((self.pcd, transformation, fitness, inlier_rmse))
+        
+        else:
+            self.main_pcd = self.pcd
+        
     def getPointcloud(self):
         return self.main_pcd
     
@@ -163,35 +162,73 @@ class  Scan():
         return self.color_image
     
     def getcameraLocation(self):
-        self.x = np.sin(self.angle*self.dtr) * self.distance - np.cos(self.angle*self.dtr) * 0.035
-        self.y = -np.cos(self.angle*self.dtr) * self.distance - np.sin(self.angle*self.dtr) * 0.035
-        self.z = 0.165
+        self.x = np.sin(self.angle * self.dtr) * self.distance - np.cos(self.angle * self.dtr) * -0.1
+        self.y = -np.cos(self.angle * self.dtr) * self.distance - np.sin(self.angle * self.dtr) * 0.0001
+        self.z = 0.200
         self.o = self.angle
         self.a = 112.5
         self.t = 0
-        
+    
     def rMatrix(self):
         self.o = self.o * self.dtr
         self.a = (-self.a) * self.dtr
         self.t = self.t * self.dtr
-        self.R = [[np.cos(self.o)*np.cos(self.t)-np.cos(self.a)*np.sin(self.o)*np.sin(self.t),-np.cos(self.o)*np.sin(self.t)-np.cos(self.a)*np.cos(self.t)*np.sin(self.o),np.sin(self.o)*np.sin(self.a)],
-                          [np.cos(self.t)*np.sin(self.o)+np.cos(self.o)*np.cos(self.a)*np.sin(self.t),np.cos(self.o)*np.cos(self.a)*np.cos(self.t)-np.sin(self.o)*np.sin(self.t),-np.cos(self.o)*np.sin(self.a)],
-                          [np.sin(self.a)*np.sin(self.t),np.cos(self.t)*np.sin(self.a),np.cos(self.a)]]
+        self.R = [[np.cos(self.o) * np.cos(self.t) - np.cos(self.a) * np.sin(self.o) * np.sin(self.t), -np.cos(self.o) * np.sin(self.t) - np.cos(self.a) * np.cos(self.t) * np.sin(self.o), np.sin(self.o) * np.sin(self.a)],
+                  [np.cos(self.t) * np.sin(self.o) + np.cos(self.o) * np.cos(self.a) * np.sin(self.t), np.cos(self.o) * np.cos(self.a) * np.cos(self.t) - np.sin(self.o) * np.sin(self.t), -np.cos(self.o) * np.sin(self.a)],
+                  [np.sin(self.a) * np.sin(self.t), np.cos(self.t) * np.sin(self.a), np.cos(self.a)]]
+    
+    def applyICP(self, source_pcd, target_pcd):
+        # Prueba con diferentes valores de threshold
+        thresholds = [0.02, 0.02, 0.03, 0.04]
         
-    def makeSTL(self,kpoints,stdRatio,depth,iterations):
-        # print(self.main_pcd)
+        best_transformation = None
+        best_fitness = -1  # Valor inicial para comparar fitness
+        best_rmse = float('inf')  # Valor inicial para comparar RMSE
+        
+        for threshold in thresholds:
+            trans_init = np.eye(4)  # Initial transformation
+            print(f"Evaluating ICP with threshold: {threshold}")
+            
+            evaluation = o3d.pipelines.registration.evaluate_registration(source_pcd, target_pcd, threshold, trans_init)
+            print("Initial evaluation:", evaluation)
+            
+            reg_p2p = o3d.pipelines.registration.registration_icp(
+                source_pcd, target_pcd, threshold, trans_init,
+                o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+                o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=2000))
+            
+            print(f"ICP converged with threshold {threshold}. Fitness: ", reg_p2p.fitness, " Inlier RMSE: ", reg_p2p.inlier_rmse)
+            print("Transformation matrix:\n", reg_p2p.transformation)
+            
+            if reg_p2p.fitness > best_fitness or (reg_p2p.fitness == best_fitness and reg_p2p.inlier_rmse < best_rmse):
+                best_transformation = reg_p2p.transformation
+                best_fitness = reg_p2p.fitness
+                best_rmse = reg_p2p.inlier_rmse
+        
+        print("Best ICP result: Fitness:", best_fitness, "Inlier RMSE:", best_rmse)
+        return best_transformation, best_fitness, best_rmse
+    
+    def finalizePointCloud(self):
+        if hasattr(self, 'all_transformations'):
+            best_pcd, best_transformation, best_fitness, best_rmse = max(self.all_transformations, key=lambda x: x[2])
+            self.main_pcd = best_pcd
+            print("Selected best point cloud with fitness:", best_fitness, "and inlier RMSE:", best_rmse)
+        return self.main_pcd
+    
+    def makeSTL(self, kpoints, stdRatio, depth, iterations):
+        self.finalizePointCloud()  # Finaliza la nube de puntos antes de crear la malla
         self.stl_pcd = self.main_pcd
         self.stl_pcd = self.stl_pcd.uniform_down_sample(every_k_points=kpoints)
-        self.stl_pcd, self.ind = self.stl_pcd.remove_statistical_outlier(nb_neighbors=100,std_ratio=stdRatio)
-        self.bbox1 = o3d.geometry.AxisAlignedBoundingBox((-0.13,-0.13,0),(0.13,0.13,0.01))
+        self.stl_pcd, self.ind = self.stl_pcd.remove_statistical_outlier(nb_neighbors=100, std_ratio=stdRatio)
+        self.bbox1 = o3d.geometry.AxisAlignedBoundingBox((-0.13, -0.13, 0), (0.13, 0.13, 0.01))
         self.bottom = self.stl_pcd.crop(self.bbox1)
         try:
             self.hull, self._ = self.bottom.compute_convex_hull()  
             self.bottom = self.hull.sample_points_uniformly(number_of_points=10000)
-            self.bottom.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1,max_nn=30))
+            self.bottom.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
             self.bottom.orient_normals_towards_camera_location(camera_location=np.array([0., 0., -10.]))
             self.bottom.paint_uniform_color([0, 0, 0])
-            self._, self.pt_map = self.bottom.hidden_point_removal([0,0,-1], 1)
+            self._, self.pt_map = self.bottom.hidden_point_removal([0, 0, -1], 1)
             self.bottom = self.bottom.select_by_index(self.pt_map)
             self.stl_pcd = self.stl_pcd + self.bottom
         except:
@@ -200,19 +237,21 @@ class  Scan():
         finally:
             self.mesh, self.densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(self.stl_pcd, depth=depth)
             self.mesh = self.mesh.filter_smooth_simple(number_of_iterations=iterations)
-            self.mesh.scale(1000, center=(0,0,0))
+            self.mesh.scale(1000, center=(0, 0, 0))
             self.mesh.compute_vertex_normals()
         
         return self.mesh
-    
 
 class App(tk.Tk):
 
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
+        self.processed = False  # Variable para indicar si la imagen ya ha sido procesada
+
 
         self.title_font = tkfont.Font(family='Arial', size=18, weight="bold", slant="italic")
         self.title("R3Dsystem")
+        self.angle = 0
         # self.wm_iconbitmap('icoontje3dscan_WDJ_icon.ico')
         self.iconbitmap(default='icoontje3dscan_WDJ_icon.ico')
         #self.resizable(False,False)
@@ -293,10 +332,10 @@ class App(tk.Tk):
 
 
 
-        #self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
-        #self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-        #self.scan.startPipeline()
-        #self.frames["StartPage"].startProgress()
+        self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
+        self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+        self.scan.startPipeline()
+        self.frames["StartPage"].startProgress()
         
         try:
             while True:
