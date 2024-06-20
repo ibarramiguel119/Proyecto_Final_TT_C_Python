@@ -14,6 +14,8 @@
 #include <sstream>
 #include <iomanip>
 #include <fcntl.h>
+#include <chrono>
+#include <thread>
 
 
 
@@ -29,9 +31,13 @@ std::string floatToString(float value, int precision);
 bool enviarDatosPorPuertoSerie(const std::string& datos);
 std::string recibirDatosPorPuertoSerie();
 double radianes_a_grados(double radianes);
+double gradosARadianes(double grados);
 std::string recibirDatosBloqueante(HANDLE serial_fd);
 bool enviarDatosBloqueante(HANDLE serial_fd, const std::string& datos);
+bool enviarDatosCaracterPorCaracter(HANDLE hSerial, const std::string& datosAEnviar);
 HANDLE abrirPuertoSerie(const std::string& puerto);
+void printVectorOfVectors(const std::vector<std::vector<int>>& vec);
+void delaySeconds(int seconds);
 
 
 
@@ -50,7 +56,7 @@ void CalcularGrados(int Altitud, int Asimuth, int Roll ,int& GAltitude, int& GAs
     //Numero de grados se moveran por punto
     GAltitude=60/H[0];
     GAsimut=360/H[1];
-    GRoll=90/H[2];
+    GRoll=270/H[2];
 }
 
 // En el siguiente arreglo almacena la distribuccion de los grados en altitude
@@ -74,7 +80,7 @@ std::vector<int>CalcularArreglo2(int GAsimut) {
 // En el siguiente arreglo almacena la distribuccion de los grados en Roll
 std::vector<int>CalcularArreglo3(int GRoll) {
     std::vector<int> array3;
-    for (int i = 0; i <= 90; i += GRoll) {
+    for (int i = 0; i <= 270; i += GRoll) {
         array3.push_back(i);
     }
     return array3;
@@ -118,24 +124,74 @@ std::tuple<double, double, double> sph2cart(double azimuth, double elevation, do
 
 
 
-std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<std::vector<int>>& result, int si,py::function callback ) {
+std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<std::vector<int>>& result, int si, int slider0Value, py::function callback) {
     std::vector<std::vector<int>> D; 
     int n = 0;
-    int l2=300; //Modificar l2 es para el tamaño del eslabon ingresarlo 
-    int cont=1;
+    int l2 = 300; //Modificar l2 es para el tamaño del eslabon ingresarlo 
+    int cont = 1;
+
     
-    //Configuracion de puerto serie 
+    // Configuracion de puerto serie 
     std::string puertoEspecifico = "\\\\.\\COM14"; // Cambiar al puerto serie específico
     HANDLE serial_fd = abrirPuertoSerie(puertoEspecifico);
 
     if (serial_fd == INVALID_HANDLE_VALUE) {
         std::cout << "Error al abrir el puerto" << std::endl;
+        return D; // Salir de la función si no se puede abrir el puerto
     }
     /////////////////////////////////////////////////////////////////////
+    //int x=0;
+    //Variable para envirar datos 
+    //while(x<=360){
+
+        //auto q1=gradosARadianes(x);
+        
+        //auto grados1 = radianes_a_grados(q1);
+            //std::cout << "Grados de q1:" << grados1 << std::endl;
+        
+
+
+        //auto q2=0.0000;
+        //auto q3=0.0000;
+        //auto q4=0.0000;
+
+        //std::string q1_str = floatToString(q1, 4);
+        //std::string q2_str = floatToString(q2, 4);
+        //std::string q3_str = floatToString(q3, 4);
+        //std::string q4_str = floatToString(q4, 4);
+        //std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str + ">";
+
+
+
+        //if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
+                //std::cout << "Datos enviados: " << datosAEnviar << std::endl;
+                //std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
+                //if (!datosRecibidos.empty()) {
+                    //std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
+                    //py::gil_scoped_acquire acquire;
+                    //callback(grados1);
+                    //py::gil_scoped_release release;
+                //} else {
+                    //std::cout << "No se recibieron datos." << std::endl;
+                //}
+            //} else {
+                //std::cerr << "Error al enviar datos." << std::endl;
+        //}
+        //delaySeconds(3);
+        //x=x+15;
+
+    //}
+
+    auto numerototal=si;
 
 
     while (n <= si) {
         std::vector<int> temp = result[n]; // Asigna el vector de enteros a un vector temporal
+        auto x = slider0Value;
+        std::cout << "Contenido del slider que se esta calculando" << slider0Value << ": "<< std::endl;
+        
+       
+
 
         std::cout << "Contenido del vector temporal temp: ";
         for (int elem : temp) {
@@ -143,134 +199,109 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
         }
         std::cout << std::endl;
 
-       // Imprime los dos primeros elementos del vector temporal
+        // Imprime los dos primeros elementos del vector temporal
         std::cout << "Contenido de temp en la iteracion Prueba " << n << ": ";
-        std::cout << temp[0] << " " << temp[1] << std::endl;
-
+        std::cout << temp[0] << " " << temp[1] <<""<< temp[2]<< std::endl;
 
         // En esta seccion se calculan los datos de grados a radianes 
-        std::vector<double> rads=grados_a_radianes(temp);
+        std::vector<double> rads = grados_a_radianes(temp);
         std::cout << "Contenido de rads:" << std::endl;
         for (double radian : rads) {
-            std::cout << radian << " ";// Separacion de los datos solo 
-           
+            std::cout << radian << " "; // Separacion de los datos solo 
         }
-        //Solo es prueba para inprimir los datos del vector rads 
         std::cout << std::endl;
         std::cout << "Contenido de rads por separado:" << std::endl;
         std::cout << rads[0] << " " << rads[1] << std::endl;
         std::cout << std::endl;
 
-        //En esta seccion se calculara los datos de la funcion de cordenadas esfericas a cartecianas 
-        auto resultado = sph2cart(rads[0],rads[1],temp[2]);
-        //En esta seccion se imprime los datos de las cordenadas 
+        // En esta seccion se calculara los datos de la funcion de cordenadas esfericas a cartecianas 
+        auto resultado = sph2cart(rads[0], rads[1], temp[2]);
+        // En esta seccion se imprime los datos de las cordenadas 
         double px = std::get<0>(resultado);
         double py = std::get<1>(resultado);
         double pz = std::get<2>(resultado);
+
+
         std::cout << "Coordenadas cartesianas (px, py, pz): ";
         std::cout << px << ", " << py << ", " << pz << std::endl;
 
-        //En la siguiente seccion se va a calcular la cinematica inversa  
-        //Para q1 se tiene que:
+        // En la siguiente seccion se va a calcular la cinematica inversa  
+        if (cont <= (x + 1)/2) {
+            auto q1 = atan(-px / py) + 3.1416;
+            auto qr = radianes_a_grados(q1);
+            auto q2 = px * sin(q1) - py * cos(q1) ; 
+            auto q3 = pz;
+            auto q4 = atan(-q2 / q3);
+            std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
+            std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
 
-        //Poner el algoritmo  del if para que la mitadad del movimiento funcione correctamente///////////////////////////////////////////
-
-        if (cont<=4)
-        {
-            auto q1=atan(-px/py)+3.1416;
-            auto qr=radianes_a_grados(q1);
-            auto q2=px*sin(q1)-py*cos(q1)+l2; 
-            //Para q3 se tiene que:
-            auto q3=pz;
-            //para q4 se tiene que:
-            auto q4=atan(-q2/q3);
-            std::cout << "Coordenadas cartesianas (q1,q2,q3,q4): ";
-            std::cout << q1 << ", " << q2 << ", " << q3 <<","<<q4<< std::endl;
-
-            //Convercion a string
+            // Conversion a string
             std::string q1_str = floatToString(q1, 4);
             std::string q2_str = floatToString(q2, 4);
             std::string q3_str = floatToString(q3, 4);
             std::string q4_str = floatToString(q4, 4);
-            //std::string datosAEnviar = q1_str;
-            std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str+">";
+            std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str + ">";
 
-            auto grados1=radianes_a_grados(q1);
+            auto grados1 = radianes_a_grados(q1);
             std::cout << "Grados de q1:" << grados1 << std::endl;
-            
 
-            if (enviarDatosBloqueante(serial_fd, datosAEnviar)) {
+            if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
                 std::cout << "Datos enviados: " << datosAEnviar << std::endl;
 
-                std::cout << "El programa llego aqui: "<< std::endl;
+                
 
                 std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
                 if (!datosRecibidos.empty()) {
-                std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
-                std::cout << "Datos recibidosD:" << datosRecibidos << std::endl;
-                std::cout << "Se ingreso en la logica del callback:" << std::endl;   
-                py::gil_scoped_acquire acquire;
-                callback(grados1);
-                py::gil_scoped_release release;
+                    std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
+                    py::gil_scoped_acquire acquire;
+                    callback(grados1,numerototal);
+                    py::gil_scoped_release release;
                 } else {
                     std::cout << "No se recibieron datos." << std::endl;
                 }
+            } else {
+                std::cerr << "Error al enviar datos." << std::endl;
             }
-
-           
-            
-          
+            delaySeconds(10);
+                
         }
         
-        if (cont > 4 && cont <= 8)
-        {
-            auto q1=atan(-px/py);
-            auto qr=radianes_a_grados(q1);
-            auto q2=px*sin(q1)-py*cos(q1)+l2; 
-            //Para q3 se tiene que:
-            auto q3=pz;
-            //para q4 se tiene que:
-            auto q4=atan(-q2/q3);
-            std::cout << "Coordenadas cartesianas (q1,q2,q3,q4): ";
-            std::cout << q1 << ", " << q2 << ", " << q3 <<","<<q4<< std::endl;
-            //Convercion a string
+        if (cont > (x + 1)/2 && cont <=x+2) {
+            auto q1 = atan(-px / py);
+            auto qr = radianes_a_grados(q1);
+            auto q2 = px * sin(q1) - py * cos(q1) ; 
+            auto q3 = pz;
+            auto q4 = atan(-q2 / q3);
+            std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
+            std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
             
+            // Conversion a string
             std::string q1_str = floatToString(q1, 4);
             std::string q2_str = floatToString(q2, 4);
             std::string q3_str = floatToString(q3, 4);
             std::string q4_str = floatToString(q4, 4);
+            std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str + ">";
 
-            std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str+">";
-
-            
-             
-            auto grados1=radianes_a_grados(q1);
+            auto grados1 = radianes_a_grados(q1);
             std::cout << "Grados de q1:" << grados1 << std::endl;
 
-            if (enviarDatosBloqueante(serial_fd, datosAEnviar)) {
+            if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
                 std::cout << "Datos enviados: " << datosAEnviar << std::endl;
 
                 std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
                 if (!datosRecibidos.empty()) {
-                std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
-                std::cout << "Datos recibidosD:" << datosRecibidos << std::endl;
-                std::cout << "Se ingreso en la logica del callback:" << std::endl;   
-                py::gil_scoped_acquire acquire;
-                callback(grados1);
-                py::gil_scoped_release release;
+                    std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
+                    py::gil_scoped_acquire acquire;
+                    callback(grados1,numerototal);
+                    py::gil_scoped_release release;
                 } else {
                     std::cout << "No se recibieron datos." << std::endl;
                 }
+            } else {
+                std::cerr << "Error al enviar datos." << std::endl;
             }
-            
-            
-            
+            delaySeconds(10);
         }
-        
-        //Para q2 se tiene que:
-      
-        //Impresion de las cordenadas de cada una de las cordenadas de la cinematica inversa 
-       
 
         D.push_back(temp); // Agrega el vector temporal a D
 
@@ -280,14 +311,14 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             std::cout << elem << " ";
         }
         std::cout << std::endl;
+        
+
         // Incrementa n para pasar a la siguiente fila
         n++;
-        cont=cont+1;
-        if (cont==8)
-        {
-            cont=1;
+        cont++;
+        if (cont == x+2) {
+            cont = 1;
         }
-        
     }
         
     return D;
@@ -296,9 +327,9 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
 
 
 
-void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::function callback) {
+void procesarDatos(int slider1Value, int slider0Value, int slider2Value,int radioEsfera,py::function callback) {
     int GAltitude, GAsimut, GRoll;
-    int radioEsfera = 299;
+    //int radioEsfera = 299;
 
     CalcularGrados(slider1Value, slider0Value, slider2Value, GAltitude, GAsimut, GRoll);
     std::cout << "Grados en Altitude: " << GAltitude << std::endl;
@@ -334,6 +365,7 @@ void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::func
 
     // Esta funcion calcula los puntos de posicionamiento de la circunferencia
     std::vector<std::vector<int>> result = CalcularPuntosMovimiento(resultado1, resultado2, slider2Value);
+    printVectorOfVectors(result);
 
     // Imprimir el resultado
     // Calculo del tamaño del tamaño de la forma en se movera el robot 
@@ -342,7 +374,7 @@ void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::func
 
     ///Imprimir los datos de vector D por separado
     //CalcularPuntosCinematicaInversa(result, si,callback); 
-    CalcularPuntosCinematicaInversa(result, si,callback); 
+    CalcularPuntosCinematicaInversa(result, si,slider0Value,callback); 
 }
 
 void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, int& NRoll){
@@ -388,6 +420,11 @@ std::string floatToString(float value, int precision) {
 //Funcion de  conversion
 double radianes_a_grados(double radianes) {
     return radianes * (180.0 / M_PI);
+}
+
+
+double gradosARadianes(double grados) {
+    return grados * M_PI / 180.0;
 }
 
 
@@ -468,6 +505,25 @@ bool enviarDatosBloqueante(HANDLE serial_fd, const std::string& datos) {
     return true;
 }
 
+
+bool enviarDatosCaracterPorCaracter(HANDLE hSerial, const std::string& datosAEnviar) {
+    DWORD bytesWritten;
+    for (char c : datosAEnviar) {
+        if (!WriteFile(hSerial, &c, 1, &bytesWritten, NULL)) {
+            std::cerr << "Error al enviar carácter: " << c << std::endl;
+            return false;
+        }else{
+             std::cout << "Carácter enviado: " << c << " (" << static_cast<int>(c) << ")" << std::endl;
+        }
+    }
+    // Esperar hasta que todos los datos hayan sido transmitidos
+    if (!FlushFileBuffers(hSerial)) {
+        std::cerr << "Error al vaciar el buffer del puerto serie." << std::endl;
+        return false;
+    }
+    return true;
+}
+
 std::string recibirDatosBloqueante(HANDLE serial_fd) {
     std::string datosRecibidos;
     char buffer[100]; // Buffer para recibir datos
@@ -488,8 +544,23 @@ std::string recibirDatosBloqueante(HANDLE serial_fd) {
 }
 
 
+/// Imprimir los datos del vector Result para comparar en matlab  
+void printVectorOfVectors(const std::vector<std::vector<int>>& vec) {
+    for (const auto& innerVec : vec) {
+        std::cout << '[';
+        for (size_t i = 0; i < innerVec.size(); ++i) {
+            std::cout << innerVec[i];
+            if (i < innerVec.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << ']' << std::endl;
+    }
+}
 
-
+void delaySeconds(int seconds) {
+    std::this_thread::sleep_for(std::chrono::seconds(seconds));
+}
 
 
 
