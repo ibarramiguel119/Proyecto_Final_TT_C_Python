@@ -67,8 +67,7 @@ class Arduino():
         self.s.close()
     
 
-
-class Scan(): 
+class Scan():
     def __init__(self, width, height, framerate, autoexposureFrames, backDistance):
         self.width = width
         self.height = height
@@ -98,16 +97,16 @@ class Scan():
     def startPipeline(self):
         self.pipe.start(self.config)
         self.align = rs.align(rs.stream.color)
-        print("Inicio de pipeline ")
+        print("Pipeline started")
     
     def stopPipeline(self):
         self.pipe.stop()
         self.pipe = None
         self.config = None
-        print("Paro de pipeline")
+        print("Pipeline stopped")
         
     def takeFoto(self):
-        print("Foto tomada con éxito!")
+        print("Photo taken successfully!")
         for i in range(self.autoexposureFrames):
             self.frameset = self.pipe.wait_for_frames()
         
@@ -147,7 +146,7 @@ class Scan():
             transformation, fitness, inlier_rmse = self.applyICP(self.pcd, self.main_pcd)
             self.pcd.transform(transformation)
             
-            # Guarda la nube de puntos transformada y las métricas
+            # Save transformed point cloud and metrics
             if not hasattr(self, 'all_transformations'):
                 self.all_transformations = []
             self.all_transformations.append((self.pcd, transformation, fitness, inlier_rmse))
@@ -178,12 +177,12 @@ class Scan():
                   [np.sin(self.a) * np.sin(self.t), np.cos(self.t) * np.sin(self.a), np.cos(self.a)]]
     
     def applyICP(self, source_pcd, target_pcd):
-        # Prueba con diferentes valores de threshold
+        # Try different threshold values
         thresholds = [0.02, 0.02, 0.03, 0.04]
         
         best_transformation = None
-        best_fitness = -1  # Valor inicial para comparar fitness
-        best_rmse = float('inf')  # Valor inicial para comparar RMSE
+        best_fitness = -1  # Initial value to compare fitness
+        best_rmse = float('inf')  # Initial value to compare RMSE
         
         for threshold in thresholds:
             trans_init = np.eye(4)  # Initial transformation
@@ -216,24 +215,34 @@ class Scan():
         return self.main_pcd
     
     def makeSTL(self, kpoints, stdRatio, depth, iterations):
-        self.finalizePointCloud()  # Finaliza la nube de puntos antes de crear la malla
+        self.finalizePointCloud()  # Finalize point cloud before creating mesh
         self.stl_pcd = self.main_pcd
         self.stl_pcd = self.stl_pcd.uniform_down_sample(every_k_points=kpoints)
         self.stl_pcd, self.ind = self.stl_pcd.remove_statistical_outlier(nb_neighbors=100, std_ratio=stdRatio)
         self.bbox1 = o3d.geometry.AxisAlignedBoundingBox((-0.13, -0.13, 0), (0.13, 0.13, 0.01))
         self.bottom = self.stl_pcd.crop(self.bbox1)
+        
         try:
-            self.hull, self._ = self.bottom.compute_convex_hull()  
-            self.bottom = self.hull.sample_points_uniformly(number_of_points=10000)
+            self.hull, _ = self.bottom.compute_convex_hull()  
+            self.boundary_vertices = self.hull.compute_boundary_vertices()
+            
+            # Generate random data to add to boundary vertices
+            random_data = np.random.rand(len(self.boundary_vertices), 3) * 0.1  # Random data between 0 and 0.1
+            
+            # Add random data to boundary vertices
+            for i, vertex_idx in enumerate(self.boundary_vertices):
+                self.bottom.vertices[vertex_idx] += random_data[i]
+            
             self.bottom.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
             self.bottom.orient_normals_towards_camera_location(camera_location=np.array([0., 0., -10.]))
             self.bottom.paint_uniform_color([0, 0, 0])
-            self._, self.pt_map = self.bottom.hidden_point_removal([0, 0, -1], 1)
+            _, self.pt_map = self.bottom.hidden_point_removal([0, 0, -1], 1)
             self.bottom = self.bottom.select_by_index(self.pt_map)
             self.stl_pcd = self.stl_pcd + self.bottom
-        except:
-            print("No bottom could be made") 
-            pass
+        
+        except Exception as e:
+            print("Error creating bottom part of mesh:", e)
+        
         finally:
             self.mesh, self.densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(self.stl_pcd, depth=depth)
             self.mesh = self.mesh.filter_smooth_simple(number_of_iterations=iterations)
@@ -242,11 +251,15 @@ class Scan():
         
         return self.mesh
 
+
+
+
 class App(tk.Tk):
 
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         self.processed = False  # Variable para indicar si la imagen ya ha sido procesada
+        self.photo_counter = 0  # Contador de fotos
 
 
         self.title_font = tkfont.Font(family='Arial', size=18, weight="bold", slant="italic")
@@ -277,22 +290,34 @@ class App(tk.Tk):
         self.enableSaveSTL = False
 
         #Prueba de captura de imagenes
-    def tomar_foto(self,q1):
+   
+
+
+    def tomar_foto(self, q1, numerototal):
+        if self.photo_counter == 0:  # Inicia la barra de progreso la primera vez
+            self.frames["StartPage"].startProgress()
+        
         print("Tomando foto...")
         print(q1)
 
         print("Foto tomada, enviando señal para continuar...")
-        #Descomentar cuando la camara este en funcionamiento
+        # Descomentar cuando la camara esté en funcionamiento
         self.scan.takeFoto()
-        self.frames["StartPage"].showImage(self.scan.giveImageArray())    
-        angle=q1
-        print("Se ejecuto el angulo")
+        self.frames["StartPage"].showImage(self.scan.giveImageArray())
+        angle = q1
+        print("Se ejecutó el número total de fotos")
         print(angle)
-        #self.frames["StartPage"].Progress(angle)               
-        #self.ard.rotate(int(self.dictionary["stepSize"]))
+        
+        self.photo_counter += 1  # Incrementa el contador de fotos
+        print(f"Fotos tomadas: {self.photo_counter}")  # Imprime el contador en la consola
+
+        # Actualiza la barra de progreso basado en el número total de fotos
+        progress_value = (self.photo_counter / numerototal) * 360
+        self.frames["StartPage"].Progress( progress_value)
+
         self.scan.processFoto(angle)
-        #self.ard.waitForRotation()    
         self.update()
+    
         
 
 
@@ -315,7 +340,7 @@ class App(tk.Tk):
             if (radio_var=="Option 1"): 
                 self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
                 self.scan.startPipeline()
-                prueba_1.procesarDatos(Altitud, Asimuth,Roll,sphere_radius, lambda q1: self.tomar_foto(q1))
+                prueba_1.procesarDatos(Altitud, Asimuth,Roll,sphere_radius, lambda q1,numerototal: self.tomar_foto(q1,numerototal))
                 print('se termino de ejectar la funcion de los datos  ')
                 self.scan.stopPipeline()
                 self.enablePC = True
