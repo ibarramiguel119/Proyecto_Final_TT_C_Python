@@ -92,6 +92,7 @@ char q1[BUFFER_SIZE] = {0};
 char q2[BUFFER_SIZE] = {0};
 char q3[BUFFER_SIZE] = {0};
 char q4[BUFFER_SIZE] = {0};
+char q5[BUFFER_SIZE] = {0};
 
 volatile uint8_t UASART = 0;
 
@@ -764,7 +765,15 @@ void processBuffer(uint8_t *buffer, uint16_t length)
             {
                 strncpy(q3, start, end - start);
                 start = end + 1;
-                strcpy(q4, start);
+                end = strchr(start, 'd');
+
+                if(end != NULL){
+                	 strncpy(q4, start, end - start);
+                	 start = end + 1;
+                	 strcpy(q5, start);
+                }
+
+
             }
         }
     }
