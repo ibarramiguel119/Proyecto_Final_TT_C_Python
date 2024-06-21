@@ -36,8 +36,10 @@ std::string recibirDatosBloqueante(HANDLE serial_fd);
 bool enviarDatosBloqueante(HANDLE serial_fd, const std::string& datos);
 bool enviarDatosCaracterPorCaracter(HANDLE hSerial, const std::string& datosAEnviar);
 HANDLE abrirPuertoSerie(const std::string& puerto);
+void cerrarPuertoSerie(HANDLE serial_fd);
 void printVectorOfVectors(const std::vector<std::vector<int>>& vec);
 void delaySeconds(int seconds);
+std::vector<double> generarPuntos(int inicio, int fin, int num_puntos);
 
 
 
@@ -181,17 +183,20 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
         //x=x+15;
 
     //}
-
+    //Ese dato se envia para saber el numero de fotos se tomaran para el proceso del robot
     auto numerototal=si;
 
+    //Calcular los puntos de la articulacion q5 del robot 
+    std::vector<double> puntos = generarPuntos(60,180,3);
+    
 
     while (n <= si) {
         std::vector<int> temp = result[n]; // Asigna el vector de enteros a un vector temporal
         auto x = slider0Value;
         std::cout << "Contenido del slider que se esta calculando" << slider0Value << ": "<< std::endl;
-        
-       
 
+
+        
 
         std::cout << "Contenido del vector temporal temp: ";
         for (int elem : temp) {
@@ -225,84 +230,98 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
         std::cout << "Coordenadas cartesianas (px, py, pz): ";
         std::cout << px << ", " << py << ", " << pz << std::endl;
 
-        // En la siguiente seccion se va a calcular la cinematica inversa  
-        if (cont <= (x + 1)/2) {
-            auto q1 = atan(-px / py) + 3.1416;
-            auto qr = radianes_a_grados(q1);
-            auto q2 = px * sin(q1) - py * cos(q1) ; 
-            auto q3 = pz;
-            auto q4 = atan(-q2 / q3);
-            std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
-            std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
-
-            // Conversion a string
-            std::string q1_str = floatToString(q1, 4);
-            std::string q2_str = floatToString(q2, 4);
-            std::string q3_str = floatToString(q3, 4);
-            std::string q4_str = floatToString(q4, 4);
-            std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str + ">";
-
-            auto grados1 = radianes_a_grados(q1);
-            std::cout << "Grados de q1:" << grados1 << std::endl;
-
-            if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
-                std::cout << "Datos enviados: " << datosAEnviar << std::endl;
-
-                
-
-                std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
-                if (!datosRecibidos.empty()) {
-                    std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
-                    py::gil_scoped_acquire acquire;
-                    callback(grados1,numerototal);
-                    py::gil_scoped_release release;
-                } else {
-                    std::cout << "No se recibieron datos." << std::endl;
-                }
-            } else {
-                std::cerr << "Error al enviar datos." << std::endl;
-            }
-            delaySeconds(10);
-                
+        //Puntos generados para la articulacion q5
+        std::vector<double> puntos = generarPuntos(60,180,3);
+        for (double punto : puntos) {
+            std::cout << punto << " ";
         }
+
+
         
-        if (cont > (x + 1)/2 && cont <=x+2) {
-            auto q1 = atan(-px / py);
-            auto qr = radianes_a_grados(q1);
-            auto q2 = px * sin(q1) - py * cos(q1) ; 
-            auto q3 = pz;
-            auto q4 = atan(-q2 / q3);
-            std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
-            std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
+            // En la siguiente seccion se va a calcular la cinematica inversa  
             
-            // Conversion a string
-            std::string q1_str = floatToString(q1, 4);
-            std::string q2_str = floatToString(q2, 4);
-            std::string q3_str = floatToString(q3, 4);
-            std::string q4_str = floatToString(q4, 4);
-            std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str + ">";
 
-            auto grados1 = radianes_a_grados(q1);
-            std::cout << "Grados de q1:" << grados1 << std::endl;
+            if (cont <= (x + 1)/2) {
+                auto q1 = atan(-px / py) + 3.1416;
+                auto qr = radianes_a_grados(q1);
+                auto q2 = px * sin(q1) - py * cos(q1) ; 
+                auto q3 = pz;
+                auto q4 = atan(-(q2+515) / q3);
+                std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
+                std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
 
-            if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
-                std::cout << "Datos enviados: " << datosAEnviar << std::endl;
+                // Conversion a string
+                std::string q1_str = floatToString(q1, 4);
+                std::string q2_str = floatToString(q2, 4);
+                std::string q3_str = floatToString(q3, 4);
+                std::string q4_str = floatToString(q4, 4);
+               
 
-                std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
-                if (!datosRecibidos.empty()) {
-                    std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
-                    py::gil_scoped_acquire acquire;
-                    callback(grados1,numerototal);
-                    py::gil_scoped_release release;
+                std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str +">";
+                auto grados1 = radianes_a_grados(q1);
+                std::cout << "Grados de q1:" << grados1 << std::endl;
+
+                if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
+                    std::cout << "Datos enviados: " << datosAEnviar << std::endl;
+
+                    
+
+                    std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
+                    if (!datosRecibidos.empty()) {
+                        std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
+                        py::gil_scoped_acquire acquire;
+                        callback(grados1,numerototal);
+                        py::gil_scoped_release release;
+                    } else {
+                        std::cout << "No se recibieron datos." << std::endl;
+                    }
                 } else {
-                    std::cout << "No se recibieron datos." << std::endl;
+                    std::cerr << "Error al enviar datos." << std::endl;
                 }
-            } else {
-                std::cerr << "Error al enviar datos." << std::endl;
+                delaySeconds(10);    
+                    
             }
-            delaySeconds(10);
-        }
+        
+           
+            if (cont > (x + 1)/2 && cont <=x+2) {
+                auto q1 = atan(-px / py);
+                auto qr = radianes_a_grados(q1);
+                auto q2 = px * sin(q1) - py * cos(q1) ; 
+                auto q3 = pz;
+                auto q4 = atan(-(q2+515) / q3);
+                std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
+                std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
+                
+                // Conversion a string
+                std::string q1_str = floatToString(q1, 4);
+                std::string q2_str = floatToString(q2, 4);
+                std::string q3_str = floatToString(q3, 4);
+                std::string q4_str = floatToString(q4, 4);
+                //std::string q5_str = floatToString(q5, 4);
+                std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str +">";
 
+                auto grados1 = radianes_a_grados(q1);
+                std::cout << "Grados de q1:" << grados1 << std::endl;
+
+                if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
+                    std::cout << "Datos enviados: " << datosAEnviar << std::endl;
+
+                    std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
+                    if (!datosRecibidos.empty()) {
+                        std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
+                        py::gil_scoped_acquire acquire;
+                        callback(grados1,numerototal);
+                        py::gil_scoped_release release;
+                    } else {
+                        std::cout << "No se recibieron datos." << std::endl;
+                    }
+                } else {
+                    std::cerr << "Error al enviar datos." << std::endl;
+                }
+                delaySeconds(10);
+            }
+        
+        
         D.push_back(temp); // Agrega el vector temporal a D
 
         // Imprime el contenido de D en esta iteración
@@ -320,14 +339,14 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
             cont = 1;
         }
     }
-        
+    cerrarPuertoSerie(serial_fd);
     return D;
 }
 
 
 
 
-void procesarDatos(int slider1Value, int slider0Value, int slider2Value,int radioEsfera,py::function callback) {
+void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::function callback) {
     int GAltitude, GAsimut, GRoll;
     //int radioEsfera = 299;
 
@@ -383,7 +402,7 @@ void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, in
     case 36: 
         NAltitude=6;
         NAsimut=6;
-        NRoll=3;
+        NRoll=3;////Solo como recordatorio esta definicion se cambio que es Radio por la naturaleza del algoritmo 
         break;
     case 64:
         NAltitude=8;
@@ -429,10 +448,6 @@ double gradosARadianes(double grados) {
 
 
 
-
-
-
-
 // Función para abrir el puerto serie y configurar la comunicación
 HANDLE abrirPuertoSerie(const std::string& puerto) {
     HANDLE serial_fd = CreateFile(puerto.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -461,6 +476,13 @@ HANDLE abrirPuertoSerie(const std::string& puerto) {
 
     return serial_fd;
 }
+
+//Funcion para cerrar el puerto serie 
+void cerrarPuertoSerie(HANDLE serial_fd) {
+    CloseHandle(serial_fd);
+    std::cout << "Puerto serie cerrado." << std::endl;
+}
+
 
 // Función para enviar datos por el puerto serie
 bool enviarDatos(HANDLE serial_fd, const std::string& datos) {
@@ -562,6 +584,24 @@ void delaySeconds(int seconds) {
     std::this_thread::sleep_for(std::chrono::seconds(seconds));
 }
 
+//Generar los puntos para q5 del movimiento para el robot
+// Definición de la función
+std::vector<double> generarPuntos(int inicio, int fin, int num_puntos) {
+    // Calcular el incremento
+    int incremento = (fin - inicio) / (num_puntos - 1);
+
+    // Vector para almacenar los puntos
+    std::vector<double> puntos;
+
+    // Generar los puntos y convertirlos a radianes
+    for (int i = 0; i < num_puntos; ++i) {
+        double grado = inicio + i * incremento;
+        double radian = grado * M_PI / 180.0; // Convertir a radianes
+        puntos.push_back(radian);
+    }
+
+    return puntos;
+} 
 
 
 

@@ -25,47 +25,7 @@ from PIL import Image
 import ast
 from tkinter.ttk import Progressbar
 
-class Arduino():
-    
-    def __init__(self,comPort,baudRate,timeout):
-        self.comPort = comPort
-        self.baudRate = baudRate
-        self.timeout = timeout
-        self.totalAngle = 0
-        self.s = serial.Serial(self.comPort,self.baudRate,timeout = self.timeout)
-        time.sleep(2)
-        self.currentstep = 0
-       
-    def rotate(self,steps):
-        self.steps = steps
-        self.negative = int(self.steps < 0)
-        if self.negative:
-            self.steps = -self.steps
-        self.stepsAsString = str(self.steps)
-        self.s.write([self.negative])
-        for i in range(5-len(self.stepsAsString)):
-            self.s.write([0]) 
-        for i in range(len(self.stepsAsString)):
-            self.s.write([int(self.stepsAsString[i])])
-            
-    def waitForRotation(self):
-        while True:
-            self.data = str(self.s.readline()) 
-            if self.data != "b''":
-                self.currentstep += self.steps 
-                if int(str(self.data)[2:len(self.data)-1]) != self.steps:
-                    self.close()
-                    raise Exception("The Arduino returned the wrong number of steps!")
-                break
-                    
-    def  giveAngle(self):
-        self.gearRatio = 6
-        self.currentAngle = ((self.currentstep * 360)/2048)/self.gearRatio 
-        return self.currentAngle
-        
-    def close(self):
-        self.s.close()
-    
+
 
 class Scan():
     def __init__(self, width, height, framerate, autoexposureFrames, backDistance):
@@ -266,7 +226,7 @@ class App(tk.Tk):
         self.title("R3Dsystem")
         self.angle = 0
         # self.wm_iconbitmap('icoontje3dscan_WDJ_icon.ico')
-        self.iconbitmap(default='icoontje3dscan_WDJ_icon.ico')
+        #self.iconbitmap(default='icoontje3dscan_WDJ_icon.ico')
         #self.resizable(False,False)
         self.dictionary = self.readSettings()
         container = tk.Frame(self)
@@ -289,17 +249,12 @@ class App(tk.Tk):
         self.enablePC = False
         self.enableSaveSTL = False
 
-        #Prueba de captura de imagenes
-   
-
 
     def tomar_foto(self, q1, numerototal):
         if self.photo_counter == 0:  # Inicia la barra de progreso la primera vez
             self.frames["StartPage"].startProgress()
-        
         print("Tomando foto...")
         print(q1)
-
         print("Foto tomada, enviando señal para continuar...")
         # Descomentar cuando la camara esté en funcionamiento
         self.scan.takeFoto()
@@ -307,22 +262,13 @@ class App(tk.Tk):
         angle = q1
         print("Se ejecutó el número total de fotos")
         print(angle)
-        
         self.photo_counter += 1  # Incrementa el contador de fotos
         print(f"Fotos tomadas: {self.photo_counter}")  # Imprime el contador en la consola
-
         # Actualiza la barra de progreso basado en el número total de fotos
         progress_value = (self.photo_counter / numerototal) * 360
         self.frames["StartPage"].Progress( progress_value)
-
         self.scan.processFoto(angle)
         self.update()
-    
-        
-
-
-   
-       
     
         
     def show_frame(self, page_name):
@@ -331,66 +277,43 @@ class App(tk.Tk):
         frame.tkraise()
         
     def startScan(self):
-        Asimuth, Altitud, Roll, sphere_radius, selected_option, radio_var = self.frames["StartPage"].getSliderData()
+        Asimuth, Altitud, Roll,selected_option, radio_var = self.frames["StartPage"].getSliderData()
 
-        if Asimuth == 0 or  Altitud == 0 or Roll == 0 or sphere_radius == 0:
-            raise ValueError("Alguno de los valores es igual a cero") 
-        else:
-            print(radio_var)
-            if (radio_var=="Option 1"): 
+        
+        
+        print(radio_var)
+        if (radio_var=="Option 1"):
+            if Asimuth == 0 or  Altitud == 0 or Roll == 0:
+                raise ValueError("Alguno de los valores es igual a cero") 
+            else:
                 self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
                 self.scan.startPipeline()
-                prueba_1.procesarDatos(Altitud, Asimuth,Roll,sphere_radius, lambda q1,numerototal: self.tomar_foto(q1,numerototal))
+                prueba_1.procesarDatos(Altitud, Asimuth,Roll, lambda q1,numerototal: self.tomar_foto(q1,numerototal))
+                print('Se termino de ejectar la funcion de los datos  ')
+                self.scan.stopPipeline()
+                self.enablePC = True
+        else:
+            if (selected_option=="Option 36"):
+                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+                self.scan.startPipeline()
+                resultado = prueba_1.Select_Imagenes_modo_2(36)
+                #prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
+                prueba_1.procesarDatos(resultado[0],resultado[1],resultado[1], lambda q1,numerototal: self.tomar_foto(q1,numerototal))
                 print('se termino de ejectar la funcion de los datos  ')
                 self.scan.stopPipeline()
                 self.enablePC = True
 
-            else:
-                if (selected_option=="Option 36"):
-                    resultado = prueba_1.Select_Imagenes_modo_2(36)
-                    prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
-                    ##datos_recibidos = prueba_1.recibir_datos_por_puerto_serie()
-                if (selected_option=="Option 64"):
-                    resultado = prueba_1.Select_Imagenes_modo_2(64)
-                    prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
-                    #datos_recibidos = prueba_1.recibir_datos_por_puerto_serie()
+            if (selected_option=="Option 64"):
+                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
+                self.scan.startPipeline()
+                resultado = prueba_1.Select_Imagenes_modo_2(64)
+                #prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
+                prueba_1.procesarDatos(resultado[0],resultado[1],resultado[1], lambda q1,numerototal: self.tomar_foto(q1,numerototal))
+                print('se termino de ejectar la funcion de los datos  ')
+                self.scan.stopPipeline()
+                self.enablePC = True
+                    
 
-
-
-        self.ard = Arduino(str(self.dictionary["COMport"]),int(self.dictionary["baudrate"]),0.1)
-        self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-        self.scan.startPipeline()
-        self.frames["StartPage"].startProgress()
-        
-        try:
-            while True:
-                
-                self.scan.takeFoto()
-                self.frames["StartPage"].showImage(self.scan.giveImageArray())              
-                angle = float(self.ard.giveAngle())
-                self.frames["StartPage"].Progress(angle)               
-                self.ard.rotate(int(self.dictionary["stepSize"]))
-                self.scan.processFoto(angle)
-                self.ard.waitForRotation()    
-                self.update()
-                if angle >= 360:
-                    print("de cirkel is rond!")
-                    self.frames["StartPage"].endProgress()
-                    break
-                
-                if keyboard.is_pressed('q'):
-                    print("hij stopt")
-                    break
-        except:
-            print("loop is kapot") 
-            pass
-        finally:      
-            self.scan.stopPipeline()
-            self.ard.close()
-            self.enablePC = True
-            self.frames["StartPage"].stlButton.configure(bg = "#f2f2f2")      
-            self.frames["StartPage"].buttonShowPC.configure(bg = "#f2f2f2")
-   
     def showPC(self):     
         o3d.visualization.draw_geometries([self.scan.getPointcloud()])
         
@@ -473,15 +396,11 @@ class StartPage(tk.Frame):
         self.sliderRoll.grid(sticky="W", row=2, column=1, pady=5, padx=10)
 
         
-        label4 = tk.Label(self.buttonFrame, text="Radio de la Roll")
-        label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
-        self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
-        self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
+        #label4 = tk.Label(self.buttonFrame, text="Radio de la Roll")
+        #label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
+        #self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        #self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
 
-       
-
-
-    
         self.selectLabel = tk.Label(self.buttonFrame, text="Seleccionar una opcion:")
         self.selectLabel.grid(sticky="W", row=0, column=4, pady=5, padx=10)
 
@@ -502,14 +421,11 @@ class StartPage(tk.Frame):
         self.radio2 = tk.Radiobutton(self.buttonFrame, text="Modo 2", variable=self.radioVar, value="Option 2")
         self.radio2.grid(sticky="W", row=2, column=2, pady=5, padx=10)
 
-        
-
-
-
+    
         self.buttonFrame.grid(sticky="W",row = 0, column = 1)
         
         self.load = Image.fromarray(np.zeros(shape=(480,848,3)), 'RGB')
-        self.left,self.upper,self.right,self.lower = 330,20,670,480
+        self.left,self.upper,self.right,self.lower = 330,20,848,480
  
         # self.load = Image.open("testfoto.png")
         self.render = ImageTk.PhotoImage(self.load.crop((self.left,self.upper,self.right,self.lower)))
@@ -524,11 +440,11 @@ class StartPage(tk.Frame):
             azimuth = self.sliderAzimuth.get()
             altitude = self.sliderAltitude.get()
             roll = self.sliderRoll.get()
-            sphere_radius = self.sliderSphereRadius.get()
+            #sphere_radius = self.sliderSphereRadius.get()
             selected_option = self.selectedOption.get()
             radio_var = self.radioVar.get()
             
-            return azimuth, altitude, roll, sphere_radius, selected_option, radio_var
+            return azimuth, altitude, roll, selected_option, radio_var
 
 
     def showImage(self,iArray):
@@ -577,19 +493,19 @@ class SettingsPage(tk.Frame):
         self.controller = controller
         
         self.buttonFrame = tk.Frame(self)
-        self.buttonMp = tk.Button(self.buttonFrame, text = 'Main Page', width = 25, command=lambda: controller.show_frame("StartPage"))
+        self.buttonMp = tk.Button(self.buttonFrame, text = 'Ventana principal', width = 25, command=lambda: controller.show_frame("StartPage"))
         self.buttonMp.grid(sticky="W",row = 0, column = 0, pady = 5, padx = 10)
         
         # self.buttonEntersettings = tk.Button(self.buttonFrame, text="Use Settings",width = 25,command=self.enterSettings)
         # self.buttonEntersettings.grid(sticky="W",row = 1, column = 0, pady = 5, padx = 10)
         
-        self.buttonDefaultsettings = tk.Button(self.buttonFrame, text="Reset Default Settings",width = 25,command=self.defaultSettings)
+        self.buttonDefaultsettings = tk.Button(self.buttonFrame, text="Reiniciar la configuracion",width = 25,command=self.defaultSettings)
         self.buttonDefaultsettings.grid(sticky="W",row = 1, column = 0, pady = 5, padx = 10)
         
-        self.buttonSavesettings = tk.Button(self.buttonFrame, text="Save and Use Settings",width = 25,command=self.controller.saveSettings)
+        self.buttonSavesettings = tk.Button(self.buttonFrame, text="Guardar la configuracion",width = 25,command=self.controller.saveSettings)
         self.buttonSavesettings.grid(sticky="W",row = 2, column = 0, pady = 5, padx = 10)
         
-        self.quitButton = tk.Button(self.buttonFrame, text = 'Quit', width = 25, command = self.controller.close_windows)
+        self.quitButton = tk.Button(self.buttonFrame, text = 'Salir', width = 25, command = self.controller.close_windows)
         self.quitButton.grid(sticky="W",row = 3, column = 0, pady = 5, padx = 10)
         
         self.buttonFrame.pack(side = "left")
