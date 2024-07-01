@@ -24,6 +24,7 @@ from PIL import ImageTk
 from PIL import Image
 import ast
 from tkinter.ttk import Progressbar
+import threading
 
 
 
@@ -147,6 +148,8 @@ class Scan():
         for threshold in thresholds:
             trans_init = np.eye(4)  # Initial transformation
             print(f"Evaluating ICP with threshold: {threshold}")
+
+            
             
             evaluation = o3d.pipelines.registration.evaluate_registration(source_pcd, target_pcd, threshold, trans_init)
             print("Initial evaluation:", evaluation)
@@ -215,19 +218,15 @@ class Scan():
 
 
 class App(tk.Tk):
-
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         self.processed = False  # Variable para indicar si la imagen ya ha sido procesada
         self.photo_counter = 0  # Contador de fotos
 
-
         self.title_font = tkfont.Font(family='Arial', size=18, weight="bold", slant="italic")
         self.title("R3Dsystem")
         self.angle = 0
-        # self.wm_iconbitmap('icoontje3dscan_WDJ_icon.ico')
-        #self.iconbitmap(default='icoontje3dscan_WDJ_icon.ico')
-        #self.resizable(False,False)
+
         self.dictionary = self.readSettings()
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand=True)
@@ -243,92 +242,142 @@ class App(tk.Tk):
 
         self.show_frame("StartPage")
         
-        #self.frames["StartPage"].stlButton.configure(bg = "#cccccc")
-        #self.frames["StartPage"].saveButton.configure(bg = "#cccccc")
-        self.frames["StartPage"].buttonShowPC.configure(bg = "#cccccc")
+        self.frames["StartPage"].buttonShowPC.configure(bg="#cccccc")
         self.enablePC = False
         self.enableSaveSTL = False
-
 
     def tomar_foto(self, q1, numerototal):
         if self.photo_counter == 0:  # Inicia la barra de progreso la primera vez
             self.frames["StartPage"].startProgress()
-        print("Tomando foto...")
-        print(q1)
-        print("Foto tomada, enviando señal para continuar...")
-        # Descomentar cuando la camara esté en funcionamiento
+            self.update()
+            self.photo_counter=0
+            self.update()
+            
+        self.frames["StartPage"].log(f"Numero total de imagenes: {numerototal}")    
+        self.frames["StartPage"].log("Tomando foto...")
+        self.update()
+        self.frames["StartPage"].log("Foto tomada, enviando señal para continuar...")
+        self.update()
+        
         self.scan.takeFoto()
+        self.update()
         self.frames["StartPage"].showImage(self.scan.giveImageArray())
         angle = q1
-        print("Se ejecutó el número total de fotos")
-        print(angle)
-        self.photo_counter += 1  # Incrementa el contador de fotos
-        print(f"Fotos tomadas: {self.photo_counter}")  # Imprime el contador en la consola
+        #self.frames["StartPage"].log("Se ejecutó el número total de fotos")
+        #self.update()
+        #self.frames["StartPage"].log(f"Ángulo: {angle}")
+        #self.update()
+        
+        
         # Actualiza la barra de progreso basado en el número total de fotos
         progress_value = (self.photo_counter / numerototal) * 360
-        self.frames["StartPage"].Progress( progress_value)
+
+        self.update()    
+        self.frames["StartPage"].Progress(progress_value)
+        self.update()
         self.scan.processFoto(angle)
         self.update()
-    
+
+
+        self.photo_counter += 1  # Incrementa el contador de fotos
+        if progress_value >=360:
+            
+            self.photo_counter = 0  # Reinicia el contador de fotos
+            progress_value = 0  # Reinicia la barra de progreso
+            self.update()
+            self.frames["StartPage"].log("Proceso terminado existosamente.")
+        self.frames["StartPage"].log(f"Imagenes capturadas: {self.photo_counter+1}")  # Imprime el contador en la consola
         
+      
+    
     def show_frame(self, page_name):
         '''Show a frame for the given page name'''
         frame = self.frames[page_name]
         frame.tkraise()
         
     def startScan(self):
-        Asimuth, Altitud, Roll,selected_option, radio_var = self.frames["StartPage"].getSliderData()
-
+        Asimuth, Altitud, Roll, New_roll, selected_option, radio_var = self.frames["StartPage"].getSliderData()
+        self.frames["StartPage"].log(f"Modo seleccionado: {radio_var}")
         
-        
-        print(radio_var)
-        if (radio_var=="Option 1"):
-            if Asimuth == 0 or  Altitud == 0 or Roll == 0:
+        if radio_var == "Option 1":
+            if Asimuth == 0 or Altitud == 0 or Roll == 0:
+                self.frames["StartPage"].log('Algunos de los valores es igul a cero')
+                self.frames["StartPage"].log('No se permiten selecionar 0 imagenes')
                 raise ValueError("Alguno de los valores es igual a cero") 
+            
             else:
-                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-                self.scan.startPipeline()
-                prueba_1.procesarDatos(Altitud, Asimuth,Roll, lambda q1,numerototal: self.tomar_foto(q1,numerototal))
-                print('Se termino de ejectar la funcion de los datos  ')
-                self.scan.stopPipeline()
-                self.enablePC = True
-        else:
-            if (selected_option=="Option 36"):
-                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-                self.scan.startPipeline()
-                resultado = prueba_1.Select_Imagenes_modo_2(36)
-                #prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
-                prueba_1.procesarDatos(resultado[0],resultado[1],resultado[1], lambda q1,numerototal: self.tomar_foto(q1,numerototal))
-                print('se termino de ejectar la funcion de los datos  ')
-                self.scan.stopPipeline()
-                self.enablePC = True
-
-            if (selected_option=="Option 64"):
-                self.scan = Scan(int(self.dictionary["widthFrame"]),int(self.dictionary["heightFrame"]),30,10,0)
-                self.scan.startPipeline()
-                resultado = prueba_1.Select_Imagenes_modo_2(64)
-                #prueba_1.procesarDatos(resultado[0],resultado[1],resultado[2])
-                prueba_1.procesarDatos(resultado[0],resultado[1],resultado[1], lambda q1,numerototal: self.tomar_foto(q1,numerototal))
-                print('se termino de ejectar la funcion de los datos  ')
-                self.scan.stopPipeline()
-                self.enablePC = True
+                self.frames["StartPage"].log('Inicializando sistema...')
+                self.update()
+                try:
+                
+                      
+                        
+                    def procesar_datos():
+                        self.update()
+                        self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                        self.update()
+                        self.scan.startPipeline()
+                        self.update()
+                        prueba_1.procesarDatos(Altitud, Asimuth, Roll, New_roll, lambda q1, numerototal: self.tomar_foto(q1, numerototal))
+                        self.update()
+                        self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                        self.frames["StartPage"].log('Esperando que se termine de evaluar la nube de puntos')
+                        self.update()
+                        self.scan.stopPipeline()
+                        self.frames["StartPage"].log('Sistema listo para mostrar el modelo')
+                        self.frames["StartPage"].Progress(360)
+                        self.update()
+                        self.enablePC = True
+                
+                    thread1 = threading.Thread(target=procesar_datos)
+                    
+            
+                    thread1.start()
                     
 
+
+                except Exception as e:
+                    self.frames["StartPage"].log(f"Error al inicializar la cámara: {str(e)}")
+                    self.scan = None  # Asegúrate de que la variable scan se restablezca si hay un error
+                self.update()
+        else:
+            if selected_option == "Option 36":
+                self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                self.scan.startPipeline()
+                resultado = prueba_1.Select_Imagenes_modo_2(36)
+                prueba_1.procesarDatos(resultado[0], resultado[1], resultado[1], lambda q1, numerototal: self.tomar_foto(q1, numerototal), self.frames["StartPage"].log)
+                self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                self.scan.stopPipeline()
+                self.enablePC = True
+
+            if selected_option == "Option 64":
+                self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                self.scan.startPipeline()
+                resultado = prueba_1.Select_Imagenes_modo_2(64)
+                prueba_1.procesarDatos(resultado[0], resultado[1], resultado[1], lambda q1, numerototal: self.tomar_foto(q1, numerototal))
+                self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                self.scan.stopPipeline()
+                self.enablePC = True
+
     def showPC(self):     
-        o3d.visualization.draw_geometries([self.scan.getPointcloud()])
+        if self.scan is not None:
+            o3d.visualization.draw_geometries([self.scan.getPointcloud()])
+        else:
+            self.frames["StartPage"].log("Error: La cámara no está inicializada o hubo un problema en el proceso de escaneo.")
         
     def makeSTL(self):
         if self.enablePC == True:
-            self.STL = self.scan.makeSTL(int(self.dictionary["k_points"]),float(self.dictionary["std_ratio"]),int(self.dictionary["depth"]),int(self.dictionary["iterations"]))
+            self.STL = self.scan.makeSTL(int(self.dictionary["k_points"]), float(self.dictionary["std_ratio"]), int(self.dictionary["depth"]), int(self.dictionary["iterations"]))
             o3d.visualization.draw_geometries([self.STL])
             self.enableSaveSTL = True
-            self.frames["StartPage"].saveButton.configure(bg = "#f2f2f2")
-            print("makestl")
+            self.frames["StartPage"].saveButton.configure(bg="#f2f2f2")
+            self.frames["StartPage"].log("STL creado")
         
     def saveSTL(self):
         if self.enableSaveSTL == True:
             self.directory = tk.filedialog.asksaveasfilename(initialfile="MySTL.stl")      
             o3d.io.write_triangle_mesh(self.directory, self.STL)
+            self.frames["StartPage"].log(f"STL guardado en {self.directory}")
      
     def readSettings(self):
         file = open("settings.txt", "r")
@@ -337,9 +386,9 @@ class App(tk.Tk):
         file.close()
         return dictionary
         
-    def writeSettings(self,newdictionary):
+    def writeSettings(self, newdictionary):
         self.newdictionary = newdictionary
-        with open("settings.txt",'w') as self.data:
+        with open("settings.txt", 'w') as self.data:
             self.data.write(str(self.newdictionary))
         
     def saveSettings(self):
@@ -349,141 +398,151 @@ class App(tk.Tk):
     def close_windows(self):     
         self.destroy()
         
-        
 class StartPage(tk.Frame):
     
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         
         self.controller = controller
-            
-        self.buttonFrame = tk.Frame(self) #,highlightbackground="black",highlightthickness=1
-        self.buttonStart = tk.Button(self.buttonFrame, text = 'Iniciar Captura', width = 25, command = self.controller.startScan)
-        self.buttonStart.grid(sticky="W",row = 0, column = 5, pady = 5, padx = 10)
+
+                # Load logo images and resize them
+        self.logo_image = Image.open("Imagen_IPN.png")  # Replace with your image path
+        self.logo_image_2 = Image.open("Imagen_upiiz.jpg")  # Replace with your image path
+        self.logo_image = self.logo_image.resize((360, 190))  # Resize the image (width, height)
+        self.logo_image_2 = self.logo_image_2.resize((90, 110))  # Resize the image (width, height)
+     
+        # Convert the images to PhotoImage
+        self.logo_photo = ImageTk.PhotoImage(self.logo_image)
+        self.logo_photo_2 = ImageTk.PhotoImage(self.logo_image_2)
         
-        self.buttonSettings = tk.Button(self.buttonFrame, text = 'Configuracion', width = 25, command=lambda: controller.show_frame("SettingsPage"))
-        self.buttonSettings.grid(sticky="W",row = 1, column = 5, pady = 5, padx = 10)
+        # Create a canvas to display the background image
+        self.canvas = tk.Canvas(self, width=1050, height=1600)  # Adjust the size as needed
+        self.canvas.grid(sticky="nw", row=0, column=0, columnspan=3, rowspan=10)
         
-        self.buttonShowPC = tk.Button(self.buttonFrame, text = 'Mostrar modelo', width = 25, command = self.controller.showPC)
-        self.buttonShowPC.grid(sticky="W",row = 2, column = 5, pady = 5, padx = 10)
+        # Place the logo images on the canvas
+        self.canvas.create_image(0, 0, anchor='nw', image=self.logo_photo)  # Adjust position as needed
+        self.canvas.create_image(950, 20, anchor='nw', image=self.logo_photo_2)  # Adjust position as needed
+        
+        # Keep a reference to avoid garbage collection
+        self.canvas.image1 = self.logo_photo
+        self.canvas.image2 = self.logo_photo_2
+
+        self.buttonFrame = tk.Frame(self)
+        self.buttonStart = tk.Button(self.buttonFrame, text='Iniciar Captura', width=15, command=self.controller.startScan, font=('Helvetica', 14))
+        self.buttonStart.grid(sticky="W", row=0, column=5, pady=5, padx=10)
+        
+        self.buttonShowPC = tk.Button(self.buttonFrame, text='Mostrar modelo', width=15, height=2, command=self.controller.showPC, font=('Helvetica', 14))
+        self.buttonShowPC.grid(sticky="W", row=2, column=5, pady=5, padx=10)
              
-        #self.stlButton = tk.Button(self.buttonFrame, text = 'Convertir a STL', width = 25, command = self.controller.makeSTL)
-        #self.stlButton.grid(sticky="W",row = 3, column =5, pady = 5, padx = 10)
-        
-        #self.saveButton = tk.Button(self.buttonFrame, text = 'Guardar STL', width = 25, command = self.controller.saveSTL)
-        #self.saveButton.grid(sticky="W",row = 4, column = 5, pady = 5, padx = 10)
-        
-        self.quitButton = tk.Button(self.buttonFrame, text = 'Salir', width = 25, command = self.controller.close_windows)
-        self.quitButton.grid(sticky="W",row = 5, column = 5, pady = 5, padx = 10)
+        self.quitButton = tk.Button(self.buttonFrame, text='Salir', width=15, command=self.controller.close_windows, font=('Helvetica', 14))
+        self.quitButton.grid(sticky="W", row=5, column=5, pady=5, padx=10)
 
-
-        #Sliders
-        
-        label1 = tk.Label(self.buttonFrame, text="Posicion azimut")
+        # Sliders
+        label1 = tk.Label(self.buttonFrame, text="Posicion azimut", font=('Helvetica', 14))
         label1.grid(sticky="W", row=0, column=0, pady=5, padx=10)
         self.sliderAzimuth = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
         self.sliderAzimuth.grid(sticky="W", row=0, column=1, pady=5, padx=10)
 
-
-        label2 = tk.Label(self.buttonFrame, text="Posicion Altitud")
+        label2 = tk.Label(self.buttonFrame, text="Posicion Altitud", font=('Helvetica', 14))
         label2.grid(sticky="W", row=1, column=0, pady=5, padx=10)
         self.sliderAltitude = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
         self.sliderAltitude.grid(sticky="W", row=1, column=1, pady=5, padx=10)
 
-        label3 = tk.Label(self.buttonFrame, text="Radio de la esfera")
+        label3 = tk.Label(self.buttonFrame, text="Radio de la esfera", font=('Helvetica', 14))
         label3.grid(sticky="W", row=2, column=0, pady=5, padx=10)
-        self.sliderRoll = tk.Scale(self.buttonFrame, from_=0, to=270, orient='horizontal', length=200)
+        self.sliderRoll = tk.Scale(self.buttonFrame, from_=1, to=210, orient='horizontal', length=200)
         self.sliderRoll.grid(sticky="W", row=2, column=1, pady=5, padx=10)
 
-        
-        #label4 = tk.Label(self.buttonFrame, text="Radio de la Roll")
-        #label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
-        #self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
-        #self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
+        label4 = tk.Label(self.buttonFrame, text="Posicion Roll", font=('Helvetica', 14))
+        label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
+        self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
 
-        self.selectLabel = tk.Label(self.buttonFrame, text="Seleccionar una opcion:")
+        self.selectLabel = tk.Label(self.buttonFrame, text="Seleccionar una opcion:", font=('Helvetica', 14))
         self.selectLabel.grid(sticky="W", row=0, column=4, pady=5, padx=10)
 
-        self.options = ["Option 36","Option 64"]
+        self.options = ["Option 36", "Option 64"]
         self.selectedOption = tk.StringVar()
         self.selectMenu = tk.OptionMenu(self.buttonFrame, self.selectedOption, *self.options)
         self.selectMenu.grid(sticky="W", row=1, column=4, pady=5, padx=10)
 
-
-        self.radioLabel = tk.Label(self.buttonFrame, text="Selecciona modo de captura:")
+        self.radioLabel = tk.Label(self.buttonFrame, text="Selecciona modo de captura:", font=('Helvetica', 14))
         self.radioLabel.grid(sticky="W", row=0, column=2, pady=5, padx=10)
 
         self.radioVar = tk.StringVar()
         self.radioVar.set("Modo 1")
-        self.radio1 = tk.Radiobutton(self.buttonFrame, text="Modo 1", variable=self.radioVar, value="Option 1")
+        self.radio1 = tk.Radiobutton(self.buttonFrame, text="Modo 1", variable=self.radioVar, value="Option 1", font=('Helvetica', 14))
         self.radio1.grid(sticky="W", row=1, column=2, pady=5, padx=10)
 
-        self.radio2 = tk.Radiobutton(self.buttonFrame, text="Modo 2", variable=self.radioVar, value="Option 2")
+        self.radio2 = tk.Radiobutton(self.buttonFrame, text="Modo 2", variable=self.radioVar, value="Option 2", font=('Helvetica', 14))
         self.radio2.grid(sticky="W", row=2, column=2, pady=5, padx=10)
 
-    
-        self.buttonFrame.grid(sticky="W",row = 0, column = 1)
+        self.buttonFrame.grid(sticky="W", row=0, column=1)
         
-        self.load = Image.fromarray(np.zeros(shape=(480,848,3)), 'RGB')
-        self.left,self.upper,self.right,self.lower = 330,20,848,480
- 
-        # self.load = Image.open("testfoto.png")
-        self.render = ImageTk.PhotoImage(self.load.crop((self.left,self.upper,self.right,self.lower)))
-        self.canvas = tk.Canvas(self, width = self.right-self.left, height = self.lower-self.upper)  
-        self.canvas.grid(sticky="s",row = 0, column = 2)
-        self.canvas.create_image(0,0, anchor='nw', image=self.render)    
-        self.canvas.image = self.render  
+        self.load = Image.fromarray(np.zeros(shape=(480, 848, 3)), 'RGB')
+        self.left, self.upper, self.right, self.lower = 330, 20, 848, 480
 
+        self.render = ImageTk.PhotoImage(self.load.crop((self.left, self.upper, self.right, self.lower)))
+        self.canvas_image = tk.Canvas(self, width=self.right-self.left, height=self.lower-self.upper)  
+        self.canvas_image.grid(sticky="s", row=0, column=2)
+        self.canvas_image.create_image(0, 0, anchor='nw', image=self.render)    
+        self.canvas_image.image = self.render  
 
+        self.text_area = tk.Text(self, height=10, wrap='word')
+        self.text_area.grid(sticky="we", row=1, column=0, columnspan=3, pady=10, padx=10)
+
+    def log(self, message):
+        self.text_area.insert(tk.END, message + '\n')
+        self.text_area.see(tk.END)
 
     def getSliderData(self):
-            azimuth = self.sliderAzimuth.get()
-            altitude = self.sliderAltitude.get()
-            roll = self.sliderRoll.get()
-            #sphere_radius = self.sliderSphereRadius.get()
-            selected_option = self.selectedOption.get()
-            radio_var = self.radioVar.get()
-            
-            return azimuth, altitude, roll, selected_option, radio_var
+        azimuth = self.sliderAzimuth.get()
+        altitude = self.sliderAltitude.get()
+        roll = self.sliderRoll.get()
+        new_roll = self.sliderSphereRadius.get()
+        selected_option = self.selectedOption.get()
+        radio_var = self.radioVar.get()
+        
+        return azimuth, altitude, roll, new_roll, selected_option, radio_var
 
-
-    def showImage(self,iArray):
+    def showImage(self, iArray):
         self.load = Image.fromarray(iArray, 'RGB')
-        self.render = ImageTk.PhotoImage(self.load.crop((self.left,self.upper,self.right,self.lower)))
-        self.canvas.create_image(0,0, anchor='nw', image=self.render)    
-        self.canvas.image = self.render
+        self.render = ImageTk.PhotoImage(self.load.crop((self.left, self.upper, self.right, self.lower)))
+        self.canvas_image.create_image(0, 0, anchor='nw', image=self.render)    
+        self.canvas_image.image = self.render
     
     def startProgress(self):
-        self.progress = Progressbar(self,orient="horizontal",length=self.right-self.left,mode='determinate',maximum = 360)
-        self.progress.grid(sticky="W",row = 1, column = 1, pady = 5) 
+        self.progress = Progressbar(self, orient="horizontal", length=self.right-self.left, mode='determinate', maximum=360)
+        self.progress.grid(sticky="NW", row=1, column=1, pady=5) 
     
-    def Progress(self,getal):
+    def Progress(self, getal):
         self.progress['value'] = getal
     
     def endProgress(self):
         self.progress.grid_forget()  
-        
-class SettingsEntry():
+
+class SettingsEntry:
     
-    def __init__(self,master,name, **kwargs):
+    def __init__(self, master, name, **kwargs):
         self.name = name
         self.master = master
         self.var = kwargs.get('var', None)
         self.frame = tk.Frame(self.master)
-        self.label = tk.Label(self.frame,text = self.name,width = 15, anchor='e')
-        self.label.pack(side = "left",fill = "both")
+        self.label = tk.Label(self.frame, text=self.name, width=15, anchor='e')
+        self.label.pack(side="left", fill="both")
         self.entry = tk.Entry(self.frame)
-        self.entry.pack(side = "left",fill = "both")
-        self.entry.delete(0)
-        self.entry.insert(0,self.var)
+        self.entry.pack(side="left", fill="both")
+        self.entry.delete(0, 'end')
+        self.entry.insert(0, self.var)
         self.frame.pack()
         
     def get(self):       
         return self.entry.get()
     
-    def insert(self,newVar):
-        self.entry.delete(0,'end')
-        self.entry.insert(0,newVar)
+    def insert(self, newVar):
+        self.entry.delete(0, 'end')
+        self.entry.insert(0, newVar)
+
         
 class SettingsPage(tk.Frame):
     
@@ -493,7 +552,7 @@ class SettingsPage(tk.Frame):
         self.controller = controller
         
         self.buttonFrame = tk.Frame(self)
-        self.buttonMp = tk.Button(self.buttonFrame, text = 'Ventana principal', width = 25, command=lambda: controller.show_frame("StartPage"))
+        self.buttonMp = tk.Button(self.buttonFrame, text = 'Ventana principal', width = 25, command=lambda: controller.show_frame("StartPage"),font=('Helvetica', 14))
         self.buttonMp.grid(sticky="W",row = 0, column = 0, pady = 5, padx = 10)
         
         # self.buttonEntersettings = tk.Button(self.buttonFrame, text="Use Settings",width = 25,command=self.enterSettings)
