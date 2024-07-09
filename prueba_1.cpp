@@ -58,7 +58,7 @@ void CalcularGrados(int Altitud, int Asimuth, int Roll ,int& GAltitude, int& GAs
     //Numero de grados se moveran por punto
     GAltitude=60/H[0];
     GAsimut=360/H[1];
-    GRoll=270/H[2];
+    GRoll=210/H[2];
 }
 
 // En el siguiente arreglo almacena la distribuccion de los grados en altitude
@@ -82,7 +82,7 @@ std::vector<int>CalcularArreglo2(int GAsimut) {
 // En el siguiente arreglo almacena la distribuccion de los grados en Roll
 std::vector<int>CalcularArreglo3(int GRoll) {
     std::vector<int> array3;
-    for (int i = 0; i <= 270; i += GRoll) {
+    for (int i = 0; i <= 210; i += GRoll) {
         array3.push_back(i);
     }
     return array3;
@@ -126,7 +126,7 @@ std::tuple<double, double, double> sph2cart(double azimuth, double elevation, do
 
 
 
-std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<std::vector<int>>& result, int si, int slider0Value, py::function callback) {
+std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<std::vector<int>>& result, int si, int slider0Value,int new_roll, py::function callback) {
     std::vector<std::vector<int>> D; 
     int n = 0;
     int l2 = 300; //Modificar l2 es para el tamaño del eslabon ingresarlo 
@@ -184,19 +184,16 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
 
     //}
     //Ese dato se envia para saber el numero de fotos se tomaran para el proceso del robot
-    auto numerototal=si;
+    auto numerototal=si*new_roll;
 
     //Calcular los puntos de la articulacion q5 del robot 
-    std::vector<double> puntos = generarPuntos(60,180,3);
+    //std::vector<double> puntos = generarPuntos(0,180,new_roll);
     
 
     while (n <= si) {
         std::vector<int> temp = result[n]; // Asigna el vector de enteros a un vector temporal
         auto x = slider0Value;
         std::cout << "Contenido del slider que se esta calculando" << slider0Value << ": "<< std::endl;
-
-
-        
 
         std::cout << "Contenido del vector temporal temp: ";
         for (int elem : temp) {
@@ -231,7 +228,7 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
         std::cout << px << ", " << py << ", " << pz << std::endl;
 
         //Puntos generados para la articulacion q5
-        std::vector<double> puntos = generarPuntos(60,180,3);
+        std::vector<double> puntos = generarPuntos(0,180,new_roll);
         for (double punto : puntos) {
             std::cout << punto << " ";
         }
@@ -240,65 +237,76 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
         
             // En la siguiente seccion se va a calcular la cinematica inversa  
             
+        
+        if (cont <= (x + 1)/2) {
 
-            if (cont <= (x + 1)/2) {
+           for (double q5 : puntos) {
+                std::cout << "q5: " << q5 << std::endl;
+
                 auto q1 = atan(-px / py) + 3.1416;
                 auto qr = radianes_a_grados(q1);
                 auto q2 = px * sin(q1) - py * cos(q1) ; 
                 auto q3 = pz;
                 auto q4 = atan(-(q2+515) / q3);
+                //auto q5 =1.5708;
                 std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
-                std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
+                std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 <<","<< q5 << std::endl;
 
                 // Conversion a string
                 std::string q1_str = floatToString(q1, 4);
                 std::string q2_str = floatToString(q2, 4);
                 std::string q3_str = floatToString(q3, 4);
                 std::string q4_str = floatToString(q4, 4);
-               
+                std::string q5_str = floatToString(q5, 4);
+                
 
-                std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str +">";
+                std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str +"d"+ q5_str+">";
                 auto grados1 = radianes_a_grados(q1);
                 std::cout << "Grados de q1:" << grados1 << std::endl;
 
                 if (enviarDatosCaracterPorCaracter(serial_fd, datosAEnviar)) {
                     std::cout << "Datos enviados: " << datosAEnviar << std::endl;
-
-                    
-
                     std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
                     if (!datosRecibidos.empty()) {
                         std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
-                        py::gil_scoped_acquire acquire;
-                        callback(grados1,numerototal);
-                        py::gil_scoped_release release;
+                        if (datosRecibidos=="1"){
+                            py::gil_scoped_acquire acquire;
+                            callback(grados1,numerototal);
+                            py::gil_scoped_release release;
+                        }else{
+                            std::cout << "Se recibio orden de confirmacion erronea." << std::endl;
+                        }
                     } else {
-                        std::cout << "No se recibieron datos." << std::endl;
+                            std::cout << "No se recibieron datos." << std::endl;
                     }
                 } else {
                     std::cerr << "Error al enviar datos." << std::endl;
                 }
-                delaySeconds(10);    
-                    
-            }
+                //delaySeconds(5);    
+            }    
+        }
         
-           
-            if (cont > (x + 1)/2 && cont <=x+2) {
+          
+        if (cont > (x + 1)/2 && cont <=x+2) {
+            for (double q5 : puntos) {
+                std::cout << "q5: " << q5 << std::endl;
+
                 auto q1 = atan(-px / py);
                 auto qr = radianes_a_grados(q1);
                 auto q2 = px * sin(q1) - py * cos(q1) ; 
                 auto q3 = pz;
                 auto q4 = atan(-(q2+515) / q3);
+                //auto q5 =1.5708;
                 std::cout << "Coordenadas cartesianas (q1, q2, q3, q4): ";
-                std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 << std::endl;
-                
-                // Conversion a string
+                std::cout << q1 << ", " << q2 << ", " << q3 << "," << q4 <<","<< q5 << std::endl;
+                    
+                    // Conversion a string
                 std::string q1_str = floatToString(q1, 4);
                 std::string q2_str = floatToString(q2, 4);
                 std::string q3_str = floatToString(q3, 4);
                 std::string q4_str = floatToString(q4, 4);
-                //std::string q5_str = floatToString(q5, 4);
-                std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str +">";
+                std::string q5_str = floatToString(q5, 4);
+                std::string datosAEnviar = q1_str + "a" + q2_str + "b" + q3_str + "c" + q4_str +"d"+q5_str+">";
 
                 auto grados1 = radianes_a_grados(q1);
                 std::cout << "Grados de q1:" << grados1 << std::endl;
@@ -309,19 +317,25 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
                     std::string datosRecibidos = recibirDatosBloqueante(serial_fd);
                     if (!datosRecibidos.empty()) {
                         std::cout << "Datos recibidos: " << datosRecibidos << std::endl;
-                        py::gil_scoped_acquire acquire;
-                        callback(grados1,numerototal);
-                        py::gil_scoped_release release;
+                        if (datosRecibidos=="1"){
+                            py::gil_scoped_acquire acquire;
+                            callback(grados1,numerototal);
+                            py::gil_scoped_release release;
+                        }else{
+                            std::cout << "Se recibio orden de confirmacion erronea." << std::endl;
+                        }
                     } else {
                         std::cout << "No se recibieron datos." << std::endl;
                     }
                 } else {
                     std::cerr << "Error al enviar datos." << std::endl;
                 }
-                delaySeconds(10);
-            }
+                delaySeconds(5);
+            }    
+        }
         
         
+
         D.push_back(temp); // Agrega el vector temporal a D
 
         // Imprime el contenido de D en esta iteración
@@ -346,7 +360,7 @@ std::vector<std::vector<int>> CalcularPuntosCinematicaInversa(const std::vector<
 
 
 
-void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::function callback) {
+void procesarDatos(int slider1Value, int slider0Value, int slider2Value,int new_roll,py::function callback) {
     int GAltitude, GAsimut, GRoll;
     //int radioEsfera = 299;
 
@@ -393,7 +407,7 @@ void procesarDatos(int slider1Value, int slider0Value, int slider2Value,py::func
 
     ///Imprimir los datos de vector D por separado
     //CalcularPuntosCinematicaInversa(result, si,callback); 
-    CalcularPuntosCinematicaInversa(result, si,slider0Value,callback); 
+    CalcularPuntosCinematicaInversa(result, si,slider0Value,new_roll,callback); 
 }
 
 void Select_Imagenes_modo_2(int Numero_imagenes,int& NAltitude, int& NAsimut, int& NRoll){
@@ -548,7 +562,7 @@ bool enviarDatosCaracterPorCaracter(HANDLE hSerial, const std::string& datosAEnv
 
 std::string recibirDatosBloqueante(HANDLE serial_fd) {
     std::string datosRecibidos;
-    char buffer[100]; // Buffer para recibir datos
+    char buffer[1]; // Buffer para recibir datos
     DWORD bytes_read;
     while (true) {
         // Leer datos del puerto serie
@@ -587,12 +601,18 @@ void delaySeconds(int seconds) {
 //Generar los puntos para q5 del movimiento para el robot
 // Definición de la función
 std::vector<double> generarPuntos(int inicio, int fin, int num_puntos) {
+
+    std::vector<double> puntos;
+    // Verificar el caso especial cuando num_puntos es 1
+    if (num_puntos == 1) {
+        // Agregar 90 grados convertido a radianes
+        double radian = 90.0 * M_PI / 180.0;
+        puntos.push_back(radian);
+        return puntos;
+    }
+
     // Calcular el incremento
     int incremento = (fin - inicio) / (num_puntos - 1);
-
-    // Vector para almacenar los puntos
-    std::vector<double> puntos;
-
     // Generar los puntos y convertirlos a radianes
     for (int i = 0; i < num_puntos; ++i) {
         double grado = inicio + i * incremento;
