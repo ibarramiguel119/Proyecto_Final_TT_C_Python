@@ -249,11 +249,11 @@ class App(tk.Tk):
     def tomar_foto(self, q1, numerototal):
         if self.photo_counter == 0:  # Inicia la barra de progreso la primera vez
             self.frames["StartPage"].startProgress()
-            self.update()
             self.photo_counter=0
-            self.update()
             
-        self.frames["StartPage"].log(f"Numero total de imagenes: {numerototal}")    
+            
+        self.frames["StartPage"].log(f"Numero total de imagenes: {numerototal}") 
+        self.update()   
         self.frames["StartPage"].log("Tomando foto...")
         self.update()
         self.frames["StartPage"].log("Foto tomada, enviando señal para continuar...")
@@ -271,25 +271,19 @@ class App(tk.Tk):
         
         # Actualiza la barra de progreso basado en el número total de fotos
         progress_value = (self.photo_counter / numerototal) * 360
-
-        self.update()    
         self.frames["StartPage"].Progress(progress_value)
         self.update()
         self.scan.processFoto(angle)
         self.update()
-
-
         self.photo_counter += 1  # Incrementa el contador de fotos
         if progress_value >=360:
-            
             self.photo_counter = 0  # Reinicia el contador de fotos
             progress_value = 0  # Reinicia la barra de progreso
-            self.update()
             self.frames["StartPage"].log("Proceso terminado existosamente.")
+            self.update()
         self.frames["StartPage"].log(f"Imagenes capturadas: {self.photo_counter+1}")  # Imprime el contador en la consola
         
-      
-    
+
     def show_frame(self, page_name):
         '''Show a frame for the given page name'''
         frame = self.frames[page_name]
@@ -310,31 +304,20 @@ class App(tk.Tk):
                 self.update()
                 try:
                 
-                      
-                        
-                    def procesar_datos():
-                        self.update()
-                        self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
-                        self.update()
-                        self.scan.startPipeline()
-                        self.update()
-                        prueba_1.procesarDatos(Altitud, Asimuth, Roll, New_roll, lambda q1, numerototal: self.tomar_foto(q1, numerototal))
-                        self.update()
-                        self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
-                        self.frames["StartPage"].log('Esperando que se termine de evaluar la nube de puntos')
-                        self.update()
-                        self.scan.stopPipeline()
-                        self.frames["StartPage"].log('Sistema listo para mostrar el modelo')
-                        self.frames["StartPage"].Progress(360)
-                        self.update()
-                        self.enablePC = True
-                
-                    thread1 = threading.Thread(target=procesar_datos)
                     
-            
-                    thread1.start()
+                    self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                    self.scan.startPipeline()
+                    prueba_1.procesarDatos(Altitud, Asimuth, Roll, New_roll, lambda q1, numerototal: self.tomar_foto(q1, numerototal))
                     
-
+                    self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                    self.update()
+                    self.frames["StartPage"].log('Esperando que se termine de evaluar la nube de puntos')
+                    self.update()
+                    self.scan.stopPipeline()
+                    self.frames["StartPage"].log('Sistema listo para mostrar el modelo')
+                    self.frames["StartPage"].Progress(360)
+                    self.update()
+                    self.enablePC = True    
 
                 except Exception as e:
                     self.frames["StartPage"].log(f"Error al inicializar la cámara: {str(e)}")
@@ -440,12 +423,13 @@ class StartPage(tk.Frame):
         # Sliders
         label1 = tk.Label(self.buttonFrame, text="Posicion azimut", font=('Helvetica', 14))
         label1.grid(sticky="W", row=0, column=0, pady=5, padx=10)
-        self.sliderAzimuth = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderAzimuth = tk.Scale(self.buttonFrame, from_=1, to=100, orient='horizontal', length=200)
         self.sliderAzimuth.grid(sticky="W", row=0, column=1, pady=5, padx=10)
 
+        self.altitudeVar = tk.IntVar()
         label2 = tk.Label(self.buttonFrame, text="Posicion Altitud", font=('Helvetica', 14))
         label2.grid(sticky="W", row=1, column=0, pady=5, padx=10)
-        self.sliderAltitude = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderAltitude = tk.Scale(self.buttonFrame, from_=1, to=100, orient='horizontal', length=200,variable=self.altitudeVar, command=self.ensure_odd)
         self.sliderAltitude.grid(sticky="W", row=1, column=1, pady=5, padx=10)
 
         label3 = tk.Label(self.buttonFrame, text="Radio de la esfera", font=('Helvetica', 14))
@@ -455,7 +439,7 @@ class StartPage(tk.Frame):
 
         label4 = tk.Label(self.buttonFrame, text="Posicion Roll", font=('Helvetica', 14))
         label4.grid(sticky="W", row=3, column=0, pady=5, padx=10)
-        self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=0, to=100, orient='horizontal', length=200)
+        self.sliderSphereRadius = tk.Scale(self.buttonFrame, from_=1, to=100, orient='horizontal', length=200)
         self.sliderSphereRadius.grid(sticky="W", row=3, column=1, pady=5, padx=10)
 
         self.selectLabel = tk.Label(self.buttonFrame, text="Seleccionar una opcion:", font=('Helvetica', 14))
@@ -490,6 +474,13 @@ class StartPage(tk.Frame):
 
         self.text_area = tk.Text(self, height=10, wrap='word')
         self.text_area.grid(sticky="we", row=1, column=0, columnspan=3, pady=10, padx=10)
+
+
+    def ensure_odd(self, value):
+        value = int(value)
+        if value % 2 == 0:
+            value += 1
+        self.altitudeVar.set(value)  
 
     def log(self, message):
         self.text_area.insert(tk.END, message + '\n')
