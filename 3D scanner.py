@@ -25,7 +25,213 @@ from PIL import Image
 import ast
 from tkinter.ttk import Progressbar
 import threading
+from tkinter import Toplevel
+from tkinter import ttk, filedialog, messagebox
+import sqlite3
+import os
+import cv2
+import time
+from PIL import Image, ImageTk  # Importa Pillow para cargar imágenes
 
+
+class Gestor:
+    def __init__(self):
+        # Inicializar la configuración del pipeline para capturar imágenes
+        self.pipeline = rs.pipeline()
+        self.config = rs.config()
+        self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+        # Inicializar variables para los frames y canvas
+        self.canvas_imagenes = None
+        self.canvas_frame = None
+        self.frame_directorios = None
+
+    def capturar_imagenes_secuenciales(self):
+        # Iniciar la captura de imágenes
+        self.pipeline.start(self.config)
+        try:
+            # Crear la carpeta donde se guardarán las imágenes
+            carpeta_principal = "Objetos_Capturados"
+            os.makedirs(carpeta_principal, exist_ok=True)
+
+            # Crear una subcarpeta con la fecha y hora actual
+            nombre_carpeta = time.strftime("Objeto_%Y%m%d_%H%M%S")
+            ruta_carpeta = os.path.join(carpeta_principal, nombre_carpeta)
+            os.makedirs(ruta_carpeta, exist_ok=True)
+
+            # Capturar 10 imágenes
+            for i in range(10):
+                frames = self.pipeline.wait_for_frames()
+                color_frame = frames.get_color_frame()
+
+                if not color_frame:
+                    continue
+
+                # Convertir los datos del frame a un array de imagen
+                color_image = np.asanyarray(color_frame.get_data())
+                ruta = os.path.join(ruta_carpeta, f"Imagen_{i+1}.jpg")
+                cv2.imwrite(ruta, color_image)
+
+                print(f"Imagen capturada: {i + 1}")
+                time.sleep(0.5)  # Espera entre capturas
+
+            messagebox.showinfo("Éxito", f"10 imágenes capturadas y guardadas en la carpeta {ruta_carpeta}.")
+            self.crear_arbol_directorios()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo capturar la imagen: {e}")
+
+        finally:
+            self.pipeline.stop()
+
+    def crear_arbol_directorios(self):
+        # Verificar si la carpeta existe
+        path = os.path.join(os.getcwd(), "Objetos_Capturados")
+
+        if not os.path.exists(path):
+            messagebox.showerror("Error", f"La carpeta {path} no existe.")
+            return
+
+        # Limpiar el contenido actual del frame
+        for widget in self.frame_directorios.winfo_children():
+            widget.destroy()
+
+        # Crear el Treeview para mostrar los directorios
+        tree = ttk.Treeview(self.frame_directorios, show="tree")
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        def agregar_elementos_arbol(parent, ruta):
+            try:
+                items = os.listdir(ruta)
+            except PermissionError:
+                return  # Omitir carpetas sin permiso
+
+            for item in items:
+                item_path = os.path.join(ruta, item)
+                if os.path.isdir(item_path):
+                    oid = tree.insert(parent, 'end', text=item, open=False, values=[item_path])
+                    agregar_elementos_arbol(oid, item_path)
+                else:
+                    tree.insert(parent, 'end', text=item, open=False, values=[item_path])
+
+        # Insertar el directorio raíz
+        root_id = tree.insert('', 'end', text=os.path.basename(path), open=True, values=[path])
+        agregar_elementos_arbol(root_id, path)
+
+        # Función que se ejecuta al seleccionar un directorio en el Treeview
+        
+
+        def on_tree_select(event):
+            selected_item = tree.selection()
+            print(f"Selected Item: {selected_item}")  # Debugging print
+            
+            if selected_item:
+                item_data = tree.item(selected_item[0])
+                print(f"Item Data: {item_data}")  # Debugging print
+                
+                if 'values' in item_data:
+                    print(f"Item Values: {item_data['values']}")  # Debugging print
+                    
+                    if item_data['values']:
+                        ruta_carpeta = item_data['values'][0]
+                        if os.path.isdir(ruta_carpeta):
+                            self.mostrar_imagenes_carpeta(ruta_carpeta)
+                        else:
+                            # If a file is selected, get its directory
+                            carpeta = os.path.dirname(ruta_carpeta)
+                            self.mostrar_imagenes_carpeta(carpeta)
+                    else:
+                        print("No values associated with the selected item.")
+                else:
+                    print("No 'values' key found in item_data.")
+            else:
+                print("No item selected.")
+        tree.bind('<<TreeviewSelect>>', on_tree_select)      
+
+
+
+
+
+
+    def mostrar_imagenes_carpeta(self, ruta_carpeta):
+        # Limpiar el canvas antes de mostrar nuevas imágenes
+        for widget in self.canvas_imagenes.winfo_children():
+            widget.destroy()
+
+        # Verificar si la carpeta existe
+        if not os.path.exists(ruta_carpeta):
+            messagebox.showerror("Error", f"La carpeta {ruta_carpeta} no existe.")
+            return
+
+        # Listar imágenes en la carpeta
+        imagenes = [f for f in os.listdir(ruta_carpeta) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
+
+        if imagenes:
+            for idx, nombre in enumerate(imagenes):
+                ruta = os.path.join(ruta_carpeta, nombre)
+                if os.path.exists(ruta):
+                    try:
+                        # Cargar y redimensionar la imagen
+                        img = Image.open(ruta)
+                        img.thumbnail((100, 100))
+                        img_tk = ImageTk.PhotoImage(img)
+
+                        # Mostrar la imagen en el canvas
+                        label = tk.Label(self.canvas_imagenes, image=img_tk, text=nombre, compound=tk.TOP)
+                        label.image = img_tk
+                        label.grid(row=idx//4, column=idx%4, padx=5, pady=5)
+                    except Exception as e:
+                        print(f"No se pudo cargar la imagen {nombre}: {e}")
+                else:
+                    print(f"No se encontró la imagen en la ruta: {ruta}")
+        else:
+            messagebox.showinfo("Sin imágenes", "No se encontraron imágenes en esta carpeta.")
+
+        # Ajustar el scroll del canvas
+        self.canvas_imagenes.update_idletasks()
+        self.canvas_frame.config(scrollregion=self.canvas_imagenes.bbox("all"))
+
+    def open_new_window(self):
+        # Crear una nueva ventana para mostrar el gestor
+        new_window = tk.Toplevel()
+        new_window.title("Gestor de Objetos")
+        new_window.geometry("1100x600")
+
+        # Frame para los directorios
+        self.frame_directorios = tk.Frame(new_window)
+        self.frame_directorios.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Frame para las imágenes
+        frame_imagenes = tk.Frame(new_window)
+        frame_imagenes.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        # Canvas para las imágenes
+        self.canvas_frame = tk.Canvas(frame_imagenes)
+        self.canvas_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Scrollbar para el canvas
+        scrollbar = tk.Scrollbar(frame_imagenes, orient=tk.VERTICAL, command=self.canvas_frame.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Asociar el scrollbar al canvas
+        self.canvas_frame.config(yscrollcommand=scrollbar.set)
+
+        # Frame interno para contener las imágenes dentro del canvas
+        self.canvas_imagenes = tk.Frame(self.canvas_frame)
+        self.canvas_frame.create_window((0, 0), window=self.canvas_imagenes, anchor="nw")
+
+        # Asociar la función de ajuste de tamaño del canvas
+        self.canvas_imagenes.bind("<Configure>", lambda event: self.canvas_frame.config(scrollregion=self.canvas_imagenes.bbox("all")))
+
+        # Botón para iniciar la captura de imágenes
+        btn_iniciar_captura = tk.Button(new_window, text="Iniciar Captura", command=self.capturar_imagenes_secuenciales)
+        btn_iniciar_captura.grid(row=1, column=0, padx=10, pady=10)
+
+        # Inicializar el árbol de directorios
+        self.crear_arbol_directorios()
+
+      
+  
 
 
 class Scan():
@@ -147,20 +353,20 @@ class Scan():
         
         for threshold in thresholds:
             trans_init = np.eye(4)  # Initial transformation
-            print(f"Evaluating ICP with threshold: {threshold}")
+            #print(f"Evaluating ICP with threshold: {threshold}")
 
             
             
             evaluation = o3d.pipelines.registration.evaluate_registration(source_pcd, target_pcd, threshold, trans_init)
-            print("Initial evaluation:", evaluation)
+            #print("Initial evaluation:", evaluation)
             
             reg_p2p = o3d.pipelines.registration.registration_icp(
                 source_pcd, target_pcd, threshold, trans_init,
                 o3d.pipelines.registration.TransformationEstimationPointToPoint(),
                 o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=2000))
             
-            print(f"ICP converged with threshold {threshold}. Fitness: ", reg_p2p.fitness, " Inlier RMSE: ", reg_p2p.inlier_rmse)
-            print("Transformation matrix:\n", reg_p2p.transformation)
+            #print(f"ICP converged with threshold {threshold}. Fitness: ", reg_p2p.fitness, " Inlier RMSE: ", reg_p2p.inlier_rmse)
+            #print("Transformation matrix:\n", reg_p2p.transformation)
             
             if reg_p2p.fitness > best_fitness or (reg_p2p.fitness == best_fitness and reg_p2p.inlier_rmse < best_rmse):
                 best_transformation = reg_p2p.transformation
@@ -174,7 +380,7 @@ class Scan():
         if hasattr(self, 'all_transformations'):
             best_pcd, best_transformation, best_fitness, best_rmse = max(self.all_transformations, key=lambda x: x[2])
             self.main_pcd = best_pcd
-            print("Selected best point cloud with fitness:", best_fitness, "and inlier RMSE:", best_rmse)
+            #print("Selected best point cloud with fitness:", best_fitness, "and inlier RMSE:", best_rmse)
         return self.main_pcd
     
     def makeSTL(self, kpoints, stdRatio, depth, iterations):
@@ -234,9 +440,11 @@ class App(tk.Tk):
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
+        self.gestor_instance = Gestor()  # Create an instance of Gestor
+
         for F in (StartPage, SettingsPage):
             page_name = F.__name__
-            frame = F(parent=container, controller=self)
+            frame = F(parent=container, controller=self, gestor_instance=self.gestor_instance)
             self.frames[page_name] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
@@ -247,12 +455,12 @@ class App(tk.Tk):
         self.enableSaveSTL = False
 
     def tomar_foto(self, q1, numerototal):
+        self.update()
         if self.photo_counter == 0:  # Inicia la barra de progreso la primera vez
             self.frames["StartPage"].startProgress()
             self.photo_counter=0
-            
-            
-        self.frames["StartPage"].log(f"Numero total de imagenes: {numerototal}") 
+
+        #self.frames["StartPage"].log(f"Numero total de imagenes: {numerototal}") 
         self.update()   
         self.frames["StartPage"].log("Tomando foto...")
         self.update()
@@ -265,8 +473,8 @@ class App(tk.Tk):
         angle = q1
         #self.frames["StartPage"].log("Se ejecutó el número total de fotos")
         #self.update()
-        #self.frames["StartPage"].log(f"Ángulo: {angle}")
-        #self.update()
+        
+        self.update()
         
         
         # Actualiza la barra de progreso basado en el número total de fotos
@@ -274,14 +482,16 @@ class App(tk.Tk):
         self.frames["StartPage"].Progress(progress_value)
         self.update()
         self.scan.processFoto(angle)
+        self.frames["StartPage"].log(f"Cordenada articular q1: {angle}")  # Imprime el contador en la consola
         self.update()
-        self.photo_counter += 1  # Incrementa el contador de fotos
-        if progress_value >=360:
+        
+        if progress_value >360:
             self.photo_counter = 0  # Reinicia el contador de fotos
             progress_value = 0  # Reinicia la barra de progreso
             self.frames["StartPage"].log("Proceso terminado existosamente.")
             self.update()
-        self.frames["StartPage"].log(f"Imagenes capturadas: {self.photo_counter+1}")  # Imprime el contador en la consola
+        self.photo_counter += 1  # Incrementa el contador de fotos
+        
         
 
     def show_frame(self, page_name):
@@ -303,8 +513,6 @@ class App(tk.Tk):
                 self.frames["StartPage"].log('Inicializando sistema...')
                 self.update()
                 try:
-                
-                    
                     self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
                     self.scan.startPipeline()
                     prueba_1.procesarDatos(Altitud, Asimuth, Roll, New_roll, lambda q1, numerototal: self.tomar_foto(q1, numerototal))
@@ -324,23 +532,71 @@ class App(tk.Tk):
                     self.scan = None  # Asegúrate de que la variable scan se restablezca si hay un error
                 self.update()
         else:
-            if selected_option == "Option 36":
-                self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
-                self.scan.startPipeline()
-                resultado = prueba_1.Select_Imagenes_modo_2(36)
-                prueba_1.procesarDatos(resultado[0], resultado[1], resultado[1], lambda q1, numerototal: self.tomar_foto(q1, numerototal), self.frames["StartPage"].log)
-                self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
-                self.scan.stopPipeline()
-                self.enablePC = True
+            if selected_option == "27 imágenes":
+                self.frames["StartPage"].log('Inicializando sistema...')
+                self.update()
+                try:
+                    self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                    self.scan.startPipeline()
+                    resultado = prueba_1.Select_Imagenes_modo_2(27)
+                    prueba_1.procesarDatos(resultado[0], resultado[1], resultado[2],3, lambda q1, numerototal: self.tomar_foto(q1, numerototal))
+                    self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                    self.update()
+                    self.frames["StartPage"].log('Esperando que se termine de evaluar la nube de puntos')
+                    self.update()
+                    self.scan.stopPipeline()
+                    self.frames["StartPage"].log('Sistema listo para mostrar el modelo')
+                    self.frames["StartPage"].Progress(360)
+                    self.update()
+                    self.enablePC = True
+                except Exception as e:
+                    self.frames["StartPage"].log(f"Error al inicializar la cámara: {str(e)}")
+                    self.scan = None  # Asegúrate de que la variable scan se restablezca si hay un error
+                self.update()
 
-            if selected_option == "Option 64":
-                self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
-                self.scan.startPipeline()
-                resultado = prueba_1.Select_Imagenes_modo_2(64)
-                prueba_1.procesarDatos(resultado[0], resultado[1], resultado[1], lambda q1, numerototal: self.tomar_foto(q1, numerototal))
-                self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
-                self.scan.stopPipeline()
-                self.enablePC = True
+            if selected_option == "50 imágenes":
+                self.frames["StartPage"].log('Inicializando sistema...')
+                self.update()
+                try:
+                    self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                    self.scan.startPipeline()
+                    resultado = prueba_1.Select_Imagenes_modo_2(50)
+                    prueba_1.procesarDatos(resultado[0], resultado[1], resultado[2],2, lambda q1, numerototal: self.tomar_foto(q1, numerototal),)
+                    self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                    self.frames["StartPage"].log('Esperando que se termine de evaluar la nube de puntos')
+                    self.update()
+                    self.scan.stopPipeline()
+                    self.frames["StartPage"].log('Sistema listo para mostrar el modelo')
+                    self.frames["StartPage"].Progress(360)
+                    self.update()
+                    self.enablePC = True
+                except Exception as e: 
+                    self.frames["StartPage"].log(f"Error al inicializar la cámara: {str(e)}")
+                    self.scan = None  # Asegúrate de que la variable scan se restablezca si hay un error
+                self.update()
+
+
+            if selected_option == "70 imágenes":
+                self.frames["StartPage"].log('Inicializando sistema...')
+                self.update()
+                try:
+                    self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                    self.scan.startPipeline()
+                    resultado = prueba_1.Select_Imagenes_modo_2(70)
+                    prueba_1.procesarDatos(resultado[0], resultado[1], resultado[2],2, lambda q1, numerototal: self.tomar_foto(q1, numerototal),)
+                    self.frames["StartPage"].log('Se terminó de ejecutar la función de los datos')
+                    self.frames["StartPage"].log('Esperando que se termine de evaluar la nube de puntos')
+                    self.update()
+                    self.scan.stopPipeline()
+                    self.frames["StartPage"].log('Sistema listo para mostrar el modelo')
+                    self.frames["StartPage"].Progress(360)
+                    self.update()
+                    self.enablePC = True
+                except Exception as e: 
+                    self.frames["StartPage"].log(f"Error al inicializar la cámara: {str(e)}")
+                    self.scan = None  # Asegúrate de que la variable scan se restablezca si hay un error
+                self.update()    
+
 
     def showPC(self):     
         if self.scan is not None:
@@ -383,9 +639,9 @@ class App(tk.Tk):
         
 class StartPage(tk.Frame):
     
-    def __init__(self, parent, controller):
+    def __init__(self, parent, controller,gestor_instance):
         tk.Frame.__init__(self, parent)
-        
+        self.gestor_instance = gestor_instance
         self.controller = controller
 
                 # Load logo images and resize them
@@ -393,6 +649,8 @@ class StartPage(tk.Frame):
         self.logo_image_2 = Image.open("Imagen_upiiz.jpg")  # Replace with your image path
         self.logo_image = self.logo_image.resize((360, 190))  # Resize the image (width, height)
         self.logo_image_2 = self.logo_image_2.resize((90, 110))  # Resize the image (width, height)
+
+        
      
         # Convert the images to PhotoImage
         self.logo_photo = ImageTk.PhotoImage(self.logo_image)
@@ -411,6 +669,14 @@ class StartPage(tk.Frame):
         self.canvas.image2 = self.logo_photo_2
 
         self.buttonFrame = tk.Frame(self)
+
+
+         # Botón para abrir una nueva ventana
+        self.buttonNewWindow = tk.Button(self.buttonFrame, text='Gestor de Imagenes', width=20, height=2, command=self.gestor_instance.open_new_window, font=('Helvetica', 14), bg='gray')
+        self.buttonNewWindow.grid(sticky="W", row=5, column=2, pady=5, padx=10)
+
+
+        
         self.buttonStart = tk.Button(self.buttonFrame, text='Iniciar Captura', width=15, command=self.controller.startScan, font=('Helvetica', 14))
         self.buttonStart.grid(sticky="W", row=0, column=5, pady=5, padx=10)
         
@@ -445,7 +711,7 @@ class StartPage(tk.Frame):
         self.selectLabel = tk.Label(self.buttonFrame, text="Seleccionar una opcion:", font=('Helvetica', 14))
         self.selectLabel.grid(sticky="W", row=0, column=4, pady=5, padx=10)
 
-        self.options = ["Option 36", "Option 64"]
+        self.options = ["27 imágenes", "50 imágenes", "70 imágenes"]
         self.selectedOption = tk.StringVar()
         self.selectMenu = tk.OptionMenu(self.buttonFrame, self.selectedOption, *self.options)
         self.selectMenu.grid(sticky="W", row=1, column=4, pady=5, padx=10)
@@ -474,6 +740,10 @@ class StartPage(tk.Frame):
 
         self.text_area = tk.Text(self, height=10, wrap='word')
         self.text_area.grid(sticky="we", row=1, column=0, columnspan=3, pady=10, padx=10)
+
+   
+
+
 
 
     def ensure_odd(self, value):
@@ -512,6 +782,9 @@ class StartPage(tk.Frame):
     def endProgress(self):
         self.progress.grid_forget()  
 
+
+
+
 class SettingsEntry:
     
     def __init__(self, master, name, **kwargs):
@@ -537,10 +810,11 @@ class SettingsEntry:
         
 class SettingsPage(tk.Frame):
     
-    def __init__(self, parent, controller):
+    def __init__(self, parent, controller,gestor_instance):
         tk.Frame.__init__(self, parent)
         
         self.controller = controller
+        self.gestor_instance = gestor_instance  # Store the gestor_instance
         
         self.buttonFrame = tk.Frame(self)
         self.buttonMp = tk.Button(self.buttonFrame, text = 'Ventana principal', width = 25, command=lambda: controller.show_frame("StartPage"),font=('Helvetica', 14))
@@ -614,3 +888,4 @@ class SettingsPage(tk.Frame):
 if __name__ == "__main__":
     app = App()
     app.mainloop()
+    
