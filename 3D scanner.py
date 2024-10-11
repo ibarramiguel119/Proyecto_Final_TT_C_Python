@@ -235,13 +235,17 @@ class Gestor:
 
 
 class Scan():
-    def __init__(self, width, height, framerate, autoexposureFrames, backDistance):
+    def __init__(self, width, height, framerate, autoexposureFrames, backDistance,ruta_carpeta):
         self.width = width
         self.height = height
         self.framerate = framerate
         self.backDistance = backDistance
         self.autoexposureFrames = autoexposureFrames
         self.main_pcd = o3d.geometry.PointCloud()
+
+        self.contador_imagenes = 0
+        self.ruta_carpeta = ruta_carpeta
+        
         
         self.pipe = rs.pipeline()
         self.config = rs.config()
@@ -274,23 +278,46 @@ class Scan():
         
     def takeFoto(self):
         print("Photo taken successfully!")
+        
+        # Ajustar autoexposición
         for i in range(self.autoexposureFrames):
             self.frameset = self.pipe.wait_for_frames()
         
+        # Capturar el frameset actual
         self.frameset = self.pipe.wait_for_frames()
         self.frameset = self.align.process(self.frameset)
+        
+        # Obtener intrínsecos de la cámara de profundidad
         self.profile = self.frameset.get_profile()
         self.depth_intrinsics = self.profile.as_video_stream_profile().get_intrinsics()
         self.w, self.h = self.depth_intrinsics.width, self.depth_intrinsics.height
         self.fx, self.fy = self.depth_intrinsics.fx, self.depth_intrinsics.fy
         self.px, self.py = self.depth_intrinsics.ppx, self.depth_intrinsics.ppy
         
+        # Obtener los frames de color y profundidad
         self.color_frame = self.frameset.get_color_frame()
         self.depth_frame = self.frameset.get_depth_frame()
         
-        self.intrinsic = o3d.camera.PinholeCameraIntrinsic(self.w, self.h, self.fx, self.fy, self.px, self.py)
+        # Verificar si los frames son válidos
+        if not self.color_frame or not self.depth_frame:
+            print("Error: no se pudieron obtener los frames de color o profundidad.")
+            return
+        
+        # Convertir los datos del frame a arrays de imagen
         self.depth_image = np.asanyarray(self.depth_frame.get_data())
         self.color_image = np.asanyarray(self.color_frame.get_data())
+        
+        # Guardar la imagen capturada en la carpeta creada por `startScaner`
+        ruta_imagen = os.path.join(self.ruta_carpeta, f"Imagen_{self.contador_imagenes}.jpg")
+
+        
+
+        cv2.imwrite(ruta_imagen, self.color_image)
+        
+        print(f"Imagen capturada y guardada en {ruta_imagen}")
+        
+        # Incrementar el contador para la siguiente imagen
+        self.contador_imagenes += 1
         
     def processFoto(self, angle):
         print(angle)
@@ -481,7 +508,7 @@ class App(tk.Tk):
         progress_value = (self.photo_counter / numerototal) * 360
         self.frames["StartPage"].Progress(progress_value)
         self.update()
-        self.scan.processFoto(angle)
+        #self.scan.processFoto(angle)
         self.frames["StartPage"].log(f"Cordenada articular q1: {angle}")  # Imprime el contador en la consola
         self.update()
         
@@ -502,7 +529,25 @@ class App(tk.Tk):
     def startScan(self):
         Asimuth, Altitud, Roll, New_roll, selected_option, radio_var = self.frames["StartPage"].getSliderData()
         self.frames["StartPage"].log(f"Modo seleccionado: {radio_var}")
+
+        # Crear la carpeta principal y una subcarpeta con la fecha y hora actual
+        self.carpeta_principal = "Objetos_Capturados"
+        os.makedirs(self.carpeta_principal, exist_ok=True)
         
+        # Crear la subcarpeta con la fecha y hora actual, pero solo una vez al inicio
+        nombre_carpeta = time.strftime("Objeto_%Y%m%d_%H%M%S")
+        self.ruta_carpeta = os.path.join(self.carpeta_principal, nombre_carpeta)
+        os.makedirs(self.ruta_carpeta, exist_ok=True)
+
+
+        print(f"Ruta de la carpeta principal: {self.carpeta_principal}")
+        print(f"Ruta completa de la carpeta: {self.ruta_carpeta}")
+        
+        # Inicializar contador de imágenes
+        self.contador_imagenes = 0
+        self.frames["StartPage"].log(f"Escaneo inicido en direcion: {self.ruta_carpeta}")
+        
+
         if radio_var == "Option 1":
             if Asimuth == 0 or Altitud == 0 or Roll == 0:
                 self.frames["StartPage"].log('Algunos de los valores es igul a cero')
@@ -513,7 +558,8 @@ class App(tk.Tk):
                 self.frames["StartPage"].log('Inicializando sistema...')
                 self.update()
                 try:
-                    self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0)
+                    print(type(self.ruta_carpeta))
+                    self.scan = Scan(int(self.dictionary["widthFrame"]), int(self.dictionary["heightFrame"]), 30, 10, 0,self.ruta_carpeta)
                     self.scan.startPipeline()
                     prueba_1.procesarDatos(Altitud, Asimuth, Roll, New_roll, lambda q1, numerototal: self.tomar_foto(q1, numerototal))
                     
@@ -596,7 +642,8 @@ class App(tk.Tk):
                     self.frames["StartPage"].log(f"Error al inicializar la cámara: {str(e)}")
                     self.scan = None  # Asegúrate de que la variable scan se restablezca si hay un error
                 self.update()    
-
+    def getCarpetaPath(self):
+        return self.ruta_carpeta
 
     def showPC(self):     
         if self.scan is not None:
