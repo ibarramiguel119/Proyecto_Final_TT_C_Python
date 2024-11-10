@@ -32,6 +32,32 @@
 #define bufersize 1
 
 #define TOLERANCE 0.001
+
+#define VALOR_0 65
+#define VALOR_PI 295
+
+#define ENABLE_PIN_q1 GPIO_PIN_1
+#define MS0_PIN_q1 GPIO_PIN_9
+#define MS1_PIN_q1 GPIO_PIN_7
+#define MS2_PIN_q1 GPIO_PIN_5
+#define STEP_q1 GPIO_PIN_3
+#define DIR_q1 GPIO_PIN_6
+
+#define ENABLE_PIN_q2 GPIO_PIN_4
+#define MS0_PIN_q2 GPIO_PIN_2
+#define MS1_PIN_q2 GPIO_PIN_0
+#define MS2_PIN_q2 GPIO_PIN_11
+#define STEP_q2 GPIO_PIN_15
+#define DIR_q2 GPIO_PIN_11
+
+#define ENABLE_PIN_q3 GPIO_PIN_9
+#define MS0_PIN_q3 GPIO_PIN_9
+#define MS1_PIN_q3 GPIO_PIN_7
+#define MS2_PIN_q3 GPIO_PIN_15
+#define STEP_q3 GPIO_PIN_13
+#define DIR_q3 GPIO_PIN_11
+
+#define VELOCIDAD 0.5
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
@@ -106,9 +132,9 @@ uint16_t GPIO_PIN_LED = GPIO_PIN_3;     // Pin GPIO que controla el LED
 
 
 
-char q1[BUFFER_SIZE] = {'0'};
-char q2[BUFFER_SIZE] = {'1','1','2'};
-char q3[BUFFER_SIZE] = {'0'};
+char q1[BUFFER_SIZE] = {0};
+char q2[BUFFER_SIZE] = {'1','1','0'};
+char q3[BUFFER_SIZE] = {0};
 char q4[BUFFER_SIZE] = {'1','.','5','7','0','7'};
 char q5[BUFFER_SIZE] = {'1','.','5','7','0','7'};
 
@@ -176,6 +202,15 @@ void cinematica_directa(double q1, double q2, double q3, double *px, double *py,
 void LeerAngulosSensor(double *q1, double *q2, double *q3);
 void ControlarMotor(double q1, double q2, double q3);
 void processBuffer(uint8_t *buffer, uint16_t length);
+void A4988_q1();
+void A4988_q2();
+void A4988_q3();
+void Home (void);
+void Home_q2(void);
+void Home_q3(void);
+void mover_motorq1_rad(float radianes);
+void mover_motorq2_mm(float milimetros);
+void mover_motorq3_mm(float milimetros);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -262,9 +297,47 @@ float PID_Update(PID_Controller *pid,float setpoint , float measurement,const ch
     sprintf(buffer_1, "Medida error %s: %s, Tiempo: %s\r\n", identifier, buffer_error, buffer_time);
 
      //Transmite la cadena anterior
-    HAL_UART_Transmit(&huart3, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
-
+    HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
 }
+
+uint32_t radianes_a_valor(float radianes) {
+    // Ajusta los radianes negativos a su equivalente positivo en el rango de 0 a 2PI
+    if (radianes < 0) {
+        radianes += M_PI;
+    }
+
+    // Normaliza el valor de radianes en el rango de 0 a PI
+    if (radianes > M_PI) {
+        radianes = M_PI;
+    }
+
+    return VALOR_0 + (uint32_t)((VALOR_PI - VALOR_0) * (radianes / M_PI));
+}
+
+uint32_t milimetros_a_pasos(float milimetros) {
+    // Calcular el número de pasos necesarios para mover la distancia en milímetros
+    float pasos_por_mm = 200.0 / 8.0; // 200 pasos por 8 mm
+    return (uint32_t)(fabs(milimetros) * pasos_por_mm);
+}
+
+volatile uint8_t FC_Home_q2 = 1;// Variable to control motor state
+volatile uint8_t FC_Home_q3 = 1;
+volatile uint8_t Paro_emergencia = 1;
+volatile uint8_t Contador = 0;
+
+volatile int pasos_retroceso = 0;
+
+volatile int bandera = 0;
+
+int paso_actual_q1 = 0;
+int paso_actual_q2 = 5350;
+int paso_actual_q3 = 0;
+
+float q1_float;
+float q4_float;
+float q5_float;
+int q2_int;
+int q3_int;
 
 /* USER CODE END 0 */
 
@@ -320,15 +393,18 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   /* USER CODE BEGIN 2 */
-  __HAL_TIM_CLEAR_FLAG(&htim2, TIM_SR_UIF);
-  HAL_TIM_Base_Start_IT(&htim2);
-
-
-  HAL_UART_Receive_IT(&huart1,&byte,bufersize);
 
 
 
+  HAL_UART_Receive_IT(&huart3,&byte,bufersize);
 
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+
+  A4988_q1();
+  A4988_q2();
+  A4988_q3();
+  //Home();
 
 ///////Valores para el control de posicion PX,PY Y PZ
 
@@ -371,42 +447,42 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1){
 
-	  	  	 sprintf(buffer_1, "Valores de articulaciones q1:\r\n");
+	  	  	 sprintf(buffer_1, "Valores de articulaciones q1  Prueba de recepccion:\r\n");
 	  	    // Transmite la cadena anterior
-	  	     HAL_UART_Transmit(&huart3, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
-	  	        // Transmite valores de control de salida
-	  	     HAL_UART_Transmit(&huart3, (uint8_t *)q1, strlen(q1), 100);
-	  	     HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+	  	     HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+	  	     // Transmite valores de control de salida
+	  	     HAL_UART_Transmit(&huart1, (uint8_t *)q1, strlen(q1), 100);
+	  	     HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
 
 	  	     sprintf(buffer_1, "Valores de articulaciones q2:\r\n");
 	  	  	  	    // Transmite la cadena anterior
-	  	  	 HAL_UART_Transmit(&huart3, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+	  	  	 HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
 
-	  	     HAL_UART_Transmit(&huart3, (uint8_t *)q2, strlen(q2), 100);
-	  	   	 HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+	  	     HAL_UART_Transmit(&huart1, (uint8_t *)q2, strlen(q2), 100);
+	  	   	 HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
 
 
 	  	     sprintf(buffer_1, "Valores de articulaciones q3:\r\n");
 	  	  	  	    // Transmite la cadena anterior
-	  	  	 HAL_UART_Transmit(&huart3, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+	  	  	 HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
 
-	  	     HAL_UART_Transmit(&huart3, (uint8_t *)q3, strlen(q3), 100);
-	  	   	 HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+	  	     HAL_UART_Transmit(&huart1, (uint8_t *)q3, strlen(q3), 100);
+	  	   	 HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
 
 
 	  	     sprintf(buffer_1, "Valores de articulaciones q4:\r\n");
 	  	  	  	    // Transmite la cadena anterior
-	  	  	 HAL_UART_Transmit(&huart3, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+	  	  	 HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
 
-	  	     HAL_UART_Transmit(&huart3, (uint8_t *)q4, strlen(q4), 100);
-	  	   	 HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+	  	     HAL_UART_Transmit(&huart1, (uint8_t *)q4, strlen(q4), 100);
+	  	   	 HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
 
 	  	     sprintf(buffer_1, "Valores de articulaciones q5:\r\n");
 	  	  	  	    // Transmite la cadena anterior
-	  	  	 HAL_UART_Transmit(&huart3, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+	  	  	 HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
 
-	  	     HAL_UART_Transmit(&huart3, (uint8_t *)q5, strlen(q5), 100);
-	  	   	 HAL_UART_Transmit(&huart3, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+	  	     HAL_UART_Transmit(&huart1, (uint8_t *)q5, strlen(q5), 100);
+	  	   	 HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -414,7 +490,7 @@ int main(void)
 	  	   	 q2_float = atof(q2);
 	  	   	 q3_float = atof(q3);
 	  	   	 q4_float = atof(q4);
-	  	   	 //q5_float = atof(q5);
+	  	   	 q5_float = atof(q5);
 
 
 
@@ -440,7 +516,7 @@ int main(void)
 /////////////CONTROL DE ARTICULACION q3
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	  	   	 //q3_float = atof(q3);
-	  	   	 PID_Update(&pid_q3,q2_float,corrected_length_q3,"q3",errors_q3, times_q3, &index_q3,&control_output_q3,&error_q3);
+	  	   	 PID_Update(&pid_q3,q3_float,corrected_length_q3,"q3",errors_q3, times_q3, &index_q3,&control_output_q3,&error_q3);
 	  	   	 corrected_length_q3 = corrected_length_q3 + control_output_q3;
 	  	   	 q3_float += 0.1; // Simulación de cambio en la longitud medida
 
@@ -465,6 +541,18 @@ int main(void)
 	  	   	 //q5_float += 0.1; // Simulación de cambio en la longitud medida
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	  	    mover_motorq1_rad(corrected_length_q1);
+	  	    HAL_Delay(100);
+	  	    mover_motorq2_mm(corrected_length_q2);
+	  	    HAL_Delay(100);
+	  	    mover_motorq3_mm(corrected_length_q3);
+	  	    HAL_Delay(200);
+
+	  	    TIM2->CCR4 = radianes_a_valor(corrected_length_q4); //q4
+	  	    HAL_Delay(200);
+	  	    TIM2->CCR2 = radianes_a_valor(q5_float); //q5
+	  	    HAL_Delay(1000);
+
 
 
 
@@ -474,7 +562,7 @@ int main(void)
 
 
 
-	  	   	 PID_Update(&pid_px,120, new_px,"px",errors_px, times_px, &index_px,&control_output_px,&error_x);
+	  	   	PID_Update(&pid_px,120, new_px,"px",errors_px, times_px, &index_px,&control_output_px,&error_x);
 	        float corrected_length_px =  new_px + control_output_px;
 	        // Simulación de un proceso que cambia la longitud medida (por ejemplo, movimiento de un actuador)
 	        new_px += 0.1; // Simulación de cambio en la longitud medida
@@ -513,9 +601,9 @@ int main(void)
 
 
 
-	        if (is_zero(error_q1) && is_zero(error_q2) && is_zero(error_q3) && is_zero(error_q4)) {
+	        if (is_zero(error_q1) && is_zero(error_q2) && is_zero(error_q3) && is_zero(error_q4) && is_zero(error_q5)) {
 	            char singleChar = '1';
-	            HAL_UART_Transmit(&huart1, (uint8_t*)&singleChar, 1, HAL_MAX_DELAY);
+	            HAL_UART_Transmit(&huart3, (uint8_t*)&singleChar, 1, HAL_MAX_DELAY);
 	        }
 
 	        HAL_Delay(1500); // Retardo de 1 segundo (1000 milisegundos)
@@ -528,6 +616,10 @@ int main(void)
 
 }
 
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -547,13 +639,19 @@ void SystemClock_Config(void)
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
+  /** Macro to configure the PLL clock source
+  */
+  __HAL_RCC_PLL_PLLSOURCE_CONFIG(RCC_PLLSOURCE_HSE);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
-  RCC_OscInitStruct.HSICalibrationValue = 64;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -565,61 +663,71 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
                               |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV8;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV1;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
 }
+
 
 /**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
   */
-void MX_TIM2_Init(void) {
-    // Enable the TIM2 clock
-    __HAL_RCC_TIM2_CLK_ENABLE();
+static void MX_TIM2_Init(void)
+{
 
-    // Timer clock configuration structure
-    TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-    // Timer master configuration structure
-    TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE END TIM2_Init 0 */
 
-    // Set the instance of TIM2
-    htim2.Instance = TIM2;
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
-    // Configure the timer parameters
-    htim2.Init.Prescaler = 8399;  // Adjust the prescaler according to your clock frequency
-    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim2.Init.Period = 9999;     // Adjust the period to achieve the desired frequency (100ms in this case)
-    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-    htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  /* USER CODE BEGIN TIM2_Init 1 */
 
-    // Initialize the TIM2 base unit
-    if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
-        Error_Handler();  // Error handling if initialization fails
-    }
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 64;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 2499;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-    // Configure the clock source
-    sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-    if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK) {
-        Error_Handler();  // Error handling if clock configuration fails
-    }
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
-    // Configure the master mode (triggering and synchronization)
-    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK) {
-        Error_Handler();  // Error handling if master configuration fails
-    }
 }
 
 
@@ -637,7 +745,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 230400;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -685,7 +793,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = 230400;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -719,22 +827,89 @@ static void MX_USART3_UART_Init(void)
 
 
 
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3|GPIO_PIN_1, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PE3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3|GPIO_PIN_7|GPIO_PIN_9|GPIO_PIN_11, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11|GPIO_PIN_13|GPIO_PIN_15|GPIO_PIN_0
+                          |GPIO_PIN_2|GPIO_PIN_4|GPIO_PIN_6, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_15, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7|GPIO_PIN_9, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PE3 PE1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PC3 PC7 PC9 PC11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_7|GPIO_PIN_9|GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PE7 PE9 PE11 PE13 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PD11 PD13 PD15 PD0
+                           PD2 PD4 PD6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_13|GPIO_PIN_15|GPIO_PIN_0
+                          |GPIO_PIN_2|GPIO_PIN_4|GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA9 PA11 PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB3 PB5 PB7 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 }
 
 
@@ -767,7 +942,29 @@ void MPU_Config(void)
 }
 
 
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin == GPIO_PIN_7) {
+    	FC_Home_q2 = 0;
+    }
+    if (GPIO_Pin == GPIO_PIN_9) {
+    	FC_Home_q3 = 0;
+    }
+    if (GPIO_Pin == GPIO_PIN_11) { //rojo
+    	HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_3);
+    	HAL_GPIO_WritePin(GPIOE, ENABLE_PIN_q1, GPIO_PIN_SET);
+    	HAL_GPIO_WritePin(GPIOD, ENABLE_PIN_q2, GPIO_PIN_SET);
+    	HAL_GPIO_WritePin(GPIOA, ENABLE_PIN_q3, GPIO_PIN_SET);
+    	Paro_emergencia = 0;
+    }
+    if (GPIO_Pin == GPIO_PIN_13) { //verde
+    	Paro_emergencia = Paro_emergencia + 1;
+    	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_3);
+    	HAL_GPIO_WritePin(GPIOE, ENABLE_PIN_q1, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOD, ENABLE_PIN_q2, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOA, ENABLE_PIN_q3, GPIO_PIN_RESET);
+    	Paro_emergencia = 1;
+    }
+}
 
 void float_to_string(float value, char* buffer, int precision) {
     int int_part = (int)value;
@@ -830,10 +1027,15 @@ void ControlarMotor(double q1, double q2, double q3) {
 /////
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if (huart->Instance == USART1)
+    if (huart->Instance == USART3)
     {
         HAL_GPIO_WritePin(GPIOE, GPIO_PIN_LED, GPIO_PIN_SET); // Enciende el LED
-        //HAL_UART_Transmit(&huart3,&byte,1, 100); // Envía la cadena a través de UART
+        sprintf(buffer_1, "Prueba de ejecuccion:\r\n");
+       	HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+
+       	sprintf(buffer_1, "Byte recibido: %c\r\n", byte); // Imprime el valor en decimal
+       	HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+
 
 
 
@@ -856,19 +1058,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         }
         else
         {
-            // Aquí puedes manejar el caso cuando se recibe '>'
-            // Por ejemplo, procesar el buffer y restablecer bufferIndex
-        	 //HAL_UART_Transmit(&huart1, prueba_1, sizeof(prueba_1) - 1, 100);
-        	 //HAL_UART_Transmit(&huart1, buffer,bufferIndex, 100);// Envía la cadena a través de UART
+        	// Añadir terminador nulo para imprimir el buffer completo como cadena
+        	buffer[bufferIndex] = '\0';
+
+        	// Imprimir el contenido del buffer recibido a través de UART1
+        	HAL_UART_Transmit(&huart1, (uint8_t *)"Buffer recibido: ", 17, HAL_MAX_DELAY);
+        	HAL_UART_Transmit(&huart1, buffer, bufferIndex, HAL_MAX_DELAY); // Envía el contenido del buffer
+        	HAL_UART_Transmit(&huart1, (uint8_t *)"\r\n", 2, HAL_MAX_DELAY);
             processBuffer(buffer, bufferIndex);
             bufferIndex = 0;
         }
 
-        HAL_UART_Receive_IT(&huart1, &byte, 1);
+        HAL_UART_Receive_IT(&huart3, &byte, 1);
 
 
 
-        // Vuelve a habilitar la recepción por interrupción
+
 
     }
 }
@@ -879,7 +1084,7 @@ void processBuffer(uint8_t *buffer, uint16_t length)
     {
         // Manejar el desbordamiento del buffer
         // Por ejemplo, enviar un mensaje de error o realizar acciones correctivas
-        HAL_UART_Transmit(&huart3, (uint8_t *)"Buffer overflow\n", 16, 100);
+        HAL_UART_Transmit(&huart1, (uint8_t *)"Buffer overflow\n", 16, 100);
         bufferOverflowFlag = 0; // Restablecer la bandera de desbordamiento
         return;
     }
@@ -922,11 +1127,202 @@ void processBuffer(uint8_t *buffer, uint16_t length)
 
 
     // Enviar cada parte a través de UART para verificar
-    //HAL_UART_Transmit(&huart3, (uint8_t *)q1, strlen(q1), 100); // 0 puntos desfazados
+    sprintf(buffer_1, "Valores de articulaciones prueba de recepcion de datos q1:\r\n");
+   	HAL_UART_Transmit(&huart1, (uint8_t*)buffer_1, strlen(buffer_1), HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart1, (uint8_t *)q1, strlen(q1), 100); // 0 puntos desfazados
     //HAL_UART_Transmit(&huart3, (uint8_t *)q2, strlen(q2), 100); // 5 puntos desfazados
     //HAL_UART_Transmit(&huart1, (uint8_t *)q3, strlen(q3), 100); // 2 puntos malos
     //HAL_UART_Transmit(&huart1, (uint8_t *)q4, strlen(q4), 100); // Enviar q4 si hay datos
 
+}
+
+void A4988_q1(){
+	HAL_GPIO_WritePin(GPIOE, ENABLE_PIN_q1, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, MS0_PIN_q1, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, MS1_PIN_q1, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, MS2_PIN_q1, GPIO_PIN_RESET);
+}
+
+void A4988_q2(){
+	HAL_GPIO_WritePin(GPIOD, ENABLE_PIN_q2, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, MS0_PIN_q2, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, MS1_PIN_q2, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, MS2_PIN_q2, GPIO_PIN_RESET);
+}
+
+void A4988_q3(){
+	HAL_GPIO_WritePin(GPIOA, ENABLE_PIN_q3, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, MS0_PIN_q3, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, MS1_PIN_q3, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOD, MS2_PIN_q3, GPIO_PIN_RESET);
+}
+
+void Home (void){
+	Home_q2();
+	Home_q3();
+	TIM2->CCR2 = radianes_a_valor(M_PI/2); //q5
+	TIM2->CCR4 = radianes_a_valor(M_PI/2); //q4
+}
+
+void Home_q2(void){
+	while(FC_Home_q2){
+		HAL_GPIO_WritePin(GPIOA, DIR_q2, GPIO_PIN_RESET);  //Retroceso
+		for (int i = 0; i < 100000 && FC_Home_q2; i++) {
+			HAL_GPIO_WritePin(GPIOA, STEP_q2, GPIO_PIN_SET);
+			HAL_Delay(VELOCIDAD);
+			HAL_GPIO_WritePin(GPIOA, STEP_q2, GPIO_PIN_RESET);
+			HAL_Delay(VELOCIDAD);
+		}
+		if (!FC_Home_q2) break;
+		HAL_Delay(500);
+	}
+
+	HAL_GPIO_WritePin(GPIOA, DIR_q2, GPIO_PIN_SET); //Avance
+	for (int i = 0; i < 2500; i++) {
+		HAL_GPIO_WritePin(GPIOA, STEP_q2, GPIO_PIN_SET);
+		HAL_Delay(VELOCIDAD);
+		HAL_GPIO_WritePin(GPIOA, STEP_q2, GPIO_PIN_RESET);
+		HAL_Delay(VELOCIDAD);
+		paso_actual_q2--;
+	}
+	HAL_Delay(500);
+	FC_Home_q2 = 1;
+}
+
+void Home_q3(void){
+	while(FC_Home_q3){
+		HAL_GPIO_WritePin(GPIOD, DIR_q3, GPIO_PIN_RESET);  //Abajo
+		for (int i = 0; i < 100000 && FC_Home_q3; i++) {
+			HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_SET);
+			HAL_Delay(VELOCIDAD);
+			HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_RESET);
+			HAL_Delay(VELOCIDAD);
+		}
+		if (!FC_Home_q3) break;
+		HAL_Delay(500);
+	}
+
+	HAL_GPIO_WritePin(GPIOD, DIR_q3, GPIO_PIN_SET); //Arriba
+	for (int i = 0; i < 80; i++) {
+		HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_SET);
+		HAL_Delay(VELOCIDAD);
+		HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_RESET);
+		HAL_Delay(VELOCIDAD);
+	}
+	HAL_Delay(500);
+	FC_Home_q3 = 1;
+}
+
+void mover_motorq1_rad(float radianes){
+
+    int pasos = (int)((radianes / (2 * M_PI)) * 400);
+    int nuevo_paso = pasos;
+    int diferencia_pasos = nuevo_paso - paso_actual_q1;
+
+    if (diferencia_pasos > 0) {
+        // Movimiento hacia adelante
+    	HAL_GPIO_WritePin(GPIOD, DIR_q1, GPIO_PIN_RESET); //Antihorario
+    	for (int i = 0; i < diferencia_pasos; i++) {
+    		HAL_GPIO_WritePin(GPIOB, STEP_q1, GPIO_PIN_SET);
+    		HAL_Delay(VELOCIDAD);
+    		HAL_GPIO_WritePin(GPIOB, STEP_q1, GPIO_PIN_RESET);
+    		HAL_Delay(VELOCIDAD);
+    	}
+    }
+
+//    if(radianes == (2*M_PI))
+//    {
+//    	radianes = 0;
+//    }
+
+    else if (diferencia_pasos < 0) {
+        // Movimiento hacia atrás
+    	HAL_GPIO_WritePin(GPIOD, DIR_q1, GPIO_PIN_SET); //Horario
+    	diferencia_pasos = -diferencia_pasos;
+    	for (int i = 0; i < diferencia_pasos ; i++) {
+    		HAL_GPIO_WritePin(GPIOB, STEP_q1, GPIO_PIN_SET);
+    		HAL_Delay(VELOCIDAD);
+    		HAL_GPIO_WritePin(GPIOB, STEP_q1, GPIO_PIN_RESET);
+    		HAL_Delay(VELOCIDAD);
+    	}
+    }
+
+    paso_actual_q1 = nuevo_paso;
+    HAL_Delay(500);
+}
+
+void mover_motorq2_mm(float milimetros){
+
+	//milimetros = milimetros - 500;
+
+    if (milimetros < 0) {
+        milimetros = 0;
+    }
+    else if (milimetros > 210) {
+        milimetros = 210;
+    }
+
+    uint32_t pasos = milimetros_a_pasos(milimetros);
+    int diferencia_pasos = pasos - paso_actual_q2;
+
+    if (diferencia_pasos != 0) {
+        if (diferencia_pasos > 0) {
+        	 HAL_GPIO_WritePin(GPIOA, DIR_q2, GPIO_PIN_RESET); //Retroceso
+        }
+        else {
+        	HAL_GPIO_WritePin(GPIOA, DIR_q2, GPIO_PIN_SET); //Avance
+            diferencia_pasos = -diferencia_pasos; // Hacer positiva la diferencia para el bucle
+        }
+
+        for (int i = 0; i < diferencia_pasos; i++) {
+        	HAL_GPIO_WritePin(GPIOA, STEP_q2, GPIO_PIN_SET);
+        	HAL_Delay(VELOCIDAD);
+        	HAL_GPIO_WritePin(GPIOA, STEP_q2, GPIO_PIN_RESET);
+        	HAL_Delay(VELOCIDAD);
+        }
+
+        paso_actual_q2 = pasos;
+    }
+
+    HAL_Delay(500);
+}
+
+void mover_motorq3_mm(float milimetros){
+
+	if (milimetros < 0) {
+		milimetros = 0;
+	}
+	else if (milimetros > 215) {
+		milimetros = 215 ;
+	}
+
+    uint32_t pasos = milimetros_a_pasos(milimetros);
+    int nuevo_paso = pasos;
+    int diferencia_pasos = nuevo_paso - paso_actual_q3;
+
+    if (diferencia_pasos > 0) {
+    	HAL_GPIO_WritePin(GPIOD, DIR_q3, GPIO_PIN_SET); //Arriba
+    	for (int i = 0; i < diferencia_pasos; i++) {
+    		HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_SET);
+    		HAL_Delay(VELOCIDAD);
+    		HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_RESET);
+    		HAL_Delay(VELOCIDAD);
+    	}
+    }
+
+    else if (diferencia_pasos < 0) {
+    	HAL_GPIO_WritePin(GPIOD, DIR_q3, GPIO_PIN_RESET);  //Abajo
+    	diferencia_pasos = -diferencia_pasos; // Hacer positiva la diferencia para el bucle
+    	for (int i = 0; i < diferencia_pasos; i++) {
+    		HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_SET);
+    		HAL_Delay(VELOCIDAD);
+    		HAL_GPIO_WritePin(GPIOD, STEP_q3, GPIO_PIN_RESET);
+    		HAL_Delay(VELOCIDAD);
+    	}
+    }
+
+    paso_actual_q3 = nuevo_paso;
+    HAL_Delay(500);
 }
 
 
